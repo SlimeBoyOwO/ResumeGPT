@@ -1,7 +1,19 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "ResumeGPT Backend - 基于大模型的简历审阅系统"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "aiomysql>=0.2.0",
+    "python-jose[cryptography]>=3.3.0",
+    "bcrypt>=4.0.0",
+    "python-multipart>=0.0.9",
+    "pydantic[email-validation]>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "aiofiles>=24.0.0",
+    "email-validator>=2.3.0",
+]
