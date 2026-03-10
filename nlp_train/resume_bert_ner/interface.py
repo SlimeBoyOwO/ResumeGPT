@@ -7,7 +7,7 @@ import json
 import numpy as np
 
 # ==========================================
-# 1. 必须与训练代码完全一致的配置
+# 1. 配置与模型定义 (保持你的原样)
 # ==========================================
 class Config:
     model_name = "hfl/chinese-roberta-wwm-ext"
@@ -19,13 +19,7 @@ class Config:
         "政治面貌", "毕业院校", "工作单位", "工作内容", "职务", 
         "项目名称", "项目责任", "学位", "毕业时间", "工作时间", "项目时间"
     ]
-    model_path = "./model_output_backup/best_model.pth"
-
-# 复制 GlobalPointer 和 ResumeNERModel 类
-# (为了保证运行，请务必把 train_pro.py 里的 GlobalPointer 和 ResumeNERModel 类复制到这里！)
-# !!! 必须复制 !!! 
-# (此处省略类定义，假设你已经复制了，或者它们在同一个包里)
-# 为方便你直接运行，我这里再贴一次简化版，确保你粘贴就能跑
+    model_path = "./model_output/best_model.pth"
 
 class GlobalPointer(nn.Module):
     def __init__(self, input_dim, heads, head_size=64, rope=True):
@@ -73,27 +67,28 @@ class ResumeNERModel(BertPreTrainedModel):
         return self.global_pointer(outputs.last_hidden_state, mask=attention_mask)
 
 # ==========================================
-# 2. 增强版推理
+# 2. 增强版推理与后处理引擎
 # ==========================================
 class InferenceEngine:
     def __init__(self):
-        print(">>> 初始化推理引擎...")
         self.tokenizer = AutoTokenizer.from_pretrained(Config.model_name)
         self.model = ResumeNERModel.from_pretrained(Config.model_name)
-        
         if os.path.exists(Config.model_path):
-            print(f">>> 加载模型权重: {Config.model_path}")
-            # strict=False 防止一些无关紧要的层报错，但这里应该完全匹配
             state = torch.load(Config.model_path, map_location=Config.device)
             self.model.load_state_dict(state)
-        else:
-            print("!!! 警告：模型文件不存在，预测结果将是随机的！")
-            
         self.model.to(Config.device)
         self.model.eval()
 
-    def predict(self, pdf_path):
-        # 1. 解析
+        # 定义用于重组的 Schema 结构
+        self.schemas = {
+            "教育经历": ["毕业时间", "毕业院校", "学位"],
+            "工作经历": ["工作时间", "工作单位", "职务", "工作内容"],
+            "项目经历": ["项目名称", "项目时间", "项目责任"]
+        }
+        # 基础字段（不需要嵌套的）
+        self.basic_fields = ["姓名", "出生年月", "性别", "电话", "最高学历", "籍贯", "落户市县", "政治面貌"]
+
+    def extract_text_from_pdf(self, pdf_path):
         text = ""
         try:
             with pdfplumber.open(pdf_path) as pdf:
@@ -101,76 +96,123 @@ class InferenceEngine:
                     t = page.extract_text()
                     if t: text += t + "\n"
         except Exception as e:
-            return {"error": str(e)}
+            return ""
+        return text
 
-        if not text: return {"error": "PDF解析内容为空"}
-        
-        print(f">>> PDF解析成功，长度: {len(text)} 字符")
-        print(f">>> 文本前50字预览: {text[:50]}...")
-
-        # 2. Tokenize
-        # 注意：return_offsets_mapping 是关键，用于将 Token 下标映射回原文字符
+    def predict_chunk(self, text_chunk, global_offset=0):
+        """处理单块文本，返回带有绝对位置的实体列表"""
         inputs = self.tokenizer(
-            text, 
-            max_length=Config.max_len, 
-            truncation=True, 
-            return_offsets_mapping=True, 
-            return_tensors="pt"
+            text_chunk, max_length=Config.max_len, truncation=True, 
+            return_offsets_mapping=True, return_tensors="pt"
         )
-        
         input_ids = inputs['input_ids'].to(Config.device)
         mask = inputs['attention_mask'].to(Config.device)
         offset_mapping = inputs['offset_mapping'][0].cpu().numpy()
         
-        # 3. 预测
         with torch.no_grad():
-            # logits: [1, num_classes, seq_len, seq_len]
-            logits = self.model(input_ids, attention_mask=mask)
+            logits = self.model(input_ids, attention_mask=mask)[0].cpu().numpy()
         
-        logits = logits[0].cpu().numpy()
-        
-        # 4. 调试信息 (关键一步)
-        max_score = np.max(logits)
-        print(f">>> 预测Logits最大值: {max_score:.4f}")
-        if max_score < 0:
-            print("!!! 警告：最大Logits小于0，说明模型认为没有实体。可能是模型欠拟合，或阈值需要调整。")
-            threshold = -1.0 # 强制调低阈值看看有没有东西
-        else:
-            threshold = 0.0
-
-        # 5. 解码
-        results = {}
+        threshold = 0.0
+        entities = []
         for idx, cat in enumerate(Config.categories):
-            matrix = logits[idx] # [seq, seq]
-            
-            # 筛选大于阈值的位置
+            matrix = logits[idx]
             start_idxs, end_idxs = np.where(matrix > threshold)
-            
-            items = []
             for s, e in zip(start_idxs, end_idxs):
                 if s > e: continue
-                
-                # 映射回字符
                 char_s = offset_mapping[s][0]
                 char_e = offset_mapping[e][1]
-                
                 if char_s == 0 and char_e == 0: continue
                 
-                val = text[char_s:char_e]
-                if val and val not in items:
-                    items.append(val)
-            
-            if items:
-                results[cat] = items
+                val = text_chunk[char_s:char_e]
+                if val:
+                    entities.append({
+                        "category": cat,
+                        "value": val,
+                        "start": char_s + global_offset, # 记录在整篇文档中的绝对位置
+                        "end": char_e + global_offset
+                    })
+        return entities
+
+    def rebuild_nested_json(self, entities):
+        """将带有位置信息的平铺实体，重组成嵌套 JSON"""
+        # 按在文档中出现的先后顺序排序
+        entities = sorted(entities, key=lambda x: x['start'])
+        
+        result = {
+            "项目经历": [],
+            "教育经历": [],
+            "工作经历": []
+        }
+        
+        # 1. 填充基础平铺字段
+        for field in self.basic_fields:
+            vals = [e['value'] for e in entities if e['category'] == field]
+            if vals:
+                result[field] = vals[0] # 取第一个出现的作为主属性
                 
-        return results
+        # 2. 动态构建嵌套列表 (使用启发式聚类：根据出现的顺序分组)
+        def build_list(block_key, block_fields):
+            current_group = {}
+            for e in entities:
+                cat = e['category']
+                if cat in block_fields:
+                    # 如果当前组已经有了这个字段，说明开启了一段新经历
+                    if cat in current_group:
+                        result[block_key].append(current_group)
+                        current_group = {}
+                    current_group[cat] = e['value']
+            # 把最后留在缓存里的一组加上去
+            if current_group:
+                result[block_key].append(current_group)
+
+        # 构建三个大模块
+        build_list("教育经历", self.schemas["教育经历"])
+        build_list("工作经历", self.schemas["工作经历"])
+        build_list("项目经历", self.schemas["项目经历"])
+
+        # 清理空列表
+        result = {k: v for k, v in result.items() if v}
+        return result
+
+    def predict(self, pdf_path):
+        text = self.extract_text_from_pdf(pdf_path)
+        if not text: return {"error": "PDF解析失败或为空"}
+        
+        # --- 滑动窗口推理，解决 512 截断问题 ---
+        all_entities = []
+        chunk_size = 450 # 预留 token 空间
+        overlap = 50
+        
+        # 简单按字符滑动（不够严谨但能解决长文本遗漏问题）
+        start = 0
+        while start < len(text):
+            end = min(start + chunk_size, len(text))
+            chunk = text[start:end]
+            chunk_entities = self.predict_chunk(chunk, global_offset=start)
+            all_entities.extend(chunk_entities)
+            if end == len(text):
+                break
+            start += (chunk_size - overlap)
+            
+        # 实体去重 (重叠部分可能会抽出一样的)
+        unique_entities = []
+        seen = set()
+        for e in all_entities:
+            identifier = f"{e['category']}-{e['start']}-{e['end']}"
+            if identifier not in seen:
+                seen.add(identifier)
+                unique_entities.append(e)
+
+        # --- 重组为嵌套 JSON ---
+        final_json = self.rebuild_nested_json(unique_entities)
+        return final_json
 
 if __name__ == "__main__":
     engine = InferenceEngine()
     # 替换为你实际的测试文件
-    res = engine.predict("./data/test_resume.pdf")
+    res = engine.predict("./data/test_2.pdf")
     
-    print("\n" + "="*30)
-    print("最终提取结果:")
+    print("\n" + "="*50)
+    print("✨ 修复后的结构化抽取结果:")
     print(json.dumps(res, ensure_ascii=False, indent=2))
-    print("="*30)
+    print("="*50)
