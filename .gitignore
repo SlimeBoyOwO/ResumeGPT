@@ -104,7 +104,7 @@ game_data/backgrounds/**
 game_data/musics/
 !game_data/musics/夜晚音效
 
-
+*.pdf
 
 
 # ============================================================
