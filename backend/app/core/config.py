@@ -1,16 +1,16 @@
-"""应用配置管理"""
+"""Application configuration."""
 
 from pathlib import Path
+
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # 应用基础配置
     APP_NAME: str = "ResumeGPT"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
 
-    # 数据库配置
     DB_HOST: str = "localhost"
     DB_PORT: int = 3306
     DB_USER: str = "root"
@@ -24,21 +24,26 @@ class Settings(BaseSettings):
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
-    # JWT 配置
     JWT_SECRET_KEY: str = "resume-gpt-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24小时
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
-    # 文件上传配置
+    CHAT_API_KEY: str | None = Field(default=None, validation_alias="CHAT_API_KEY")
+
     UPLOAD_DIR: Path = Path(__file__).resolve().parent.parent.parent / "uploads"
     RESUME_UPLOAD_DIR: Path = UPLOAD_DIR / "resumes"
-    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
+    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024
     ALLOWED_RESUME_EXTENSIONS: set[str] = {
-        ".pdf", ".docx", ".doc",
-        ".jpg", ".jpeg", ".png", ".bmp", ".webp",
+        ".pdf",
+        ".docx",
+        ".doc",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".bmp",
+        ".webp",
     }
 
-    # CORS 配置
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
@@ -49,6 +54,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-# 确保上传目录存在
 settings.RESUME_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

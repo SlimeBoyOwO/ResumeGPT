@@ -8,7 +8,7 @@ const auth = useAuthStore()
 const stats = ref({
   totalResumes: 0,
   pendingResumes: 0,
-  completedResumes: 0,
+  parsedResumes: 0,
 })
 
 const loading = ref(true)
@@ -21,10 +21,10 @@ onMounted(async () => {
     const pending = await api.get('/resumes/', { params: { status_filter: 'pending', page_size: 1 } })
     stats.value.pendingResumes = pending.data.total
 
-    const completed = await api.get('/resumes/', {
-      params: { status_filter: 'completed', page_size: 1 },
+    const parsed = await api.get('/resumes/', {
+      params: { status_filter: 'parsed', page_size: 1 },
     })
-    stats.value.completedResumes = completed.data.total
+    stats.value.parsedResumes = parsed.data.total
   } catch {
     // 忽略错误
   } finally {
@@ -42,14 +42,14 @@ const statCards = [
   },
   {
     key: 'pendingResumes',
-    label: '待分析',
+    label: '待解析',
     icon: '⏳',
     gradient: 'from-warning-400 to-warning-500',
     shadow: 'shadow-warning-400/20',
   },
   {
-    key: 'completedResumes',
-    label: '已完成',
+    key: 'parsedResumes',
+    label: '已解析',
     icon: '✅',
     gradient: 'from-accent-400 to-accent-600',
     shadow: 'shadow-accent-400/20',

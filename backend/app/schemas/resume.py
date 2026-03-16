@@ -1,6 +1,9 @@
-"""简历相关 Pydantic Schemas"""
+"""Resume-related Pydantic schemas."""
+
+from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -9,14 +12,11 @@ class ResumeResponse(BaseModel):
     id: int
     user_id: int
     original_filename: str
-    file_size: int
     file_type: str
     status: str
-    score: float | None = None
-    analysis_summary: str | None = None
-    best_match_position: str | None = None
+    ner_extracted_data: dict[str, Any] | None = None
+    vector_id: str | None = None
     uploaded_at: datetime
-    # 关联的用户名（管理员查看用）
     username: str | None = None
 
     model_config = {"from_attributes": True}

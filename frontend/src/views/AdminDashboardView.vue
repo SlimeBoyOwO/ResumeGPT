@@ -6,23 +6,23 @@ const stats = ref({
   totalUsers: 0,
   totalResumes: 0,
   pendingResumes: 0,
-  completedResumes: 0,
+  parsedResumes: 0,
 })
 
 const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const [usersRes, resumesRes, pendingRes, completedRes] = await Promise.all([
+    const [usersRes, resumesRes, pendingRes, parsedRes] = await Promise.all([
       api.get('/users/', { params: { page_size: 1 } }),
       api.get('/resumes/admin/all', { params: { page_size: 1 } }),
       api.get('/resumes/admin/all', { params: { status_filter: 'pending', page_size: 1 } }),
-      api.get('/resumes/admin/all', { params: { status_filter: 'completed', page_size: 1 } }),
+      api.get('/resumes/admin/all', { params: { status_filter: 'parsed', page_size: 1 } }),
     ])
     stats.value.totalUsers = usersRes.data.total
     stats.value.totalResumes = resumesRes.data.total
     stats.value.pendingResumes = pendingRes.data.total
-    stats.value.completedResumes = completedRes.data.total
+    stats.value.parsedResumes = parsedRes.data.total
   } catch {
     // 忽略
   } finally {
@@ -45,13 +45,13 @@ const cards = [
   },
   {
     key: 'pendingResumes',
-    label: '待分析',
+    label: '待解析',
     icon: '⏳',
     gradient: 'from-warning-400 to-warning-500',
   },
   {
-    key: 'completedResumes',
-    label: '已完成',
+    key: 'parsedResumes',
+    label: '已解析',
     icon: '✅',
     gradient: 'from-green-400 to-green-600',
   },

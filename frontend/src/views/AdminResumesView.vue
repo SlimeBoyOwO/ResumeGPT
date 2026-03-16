@@ -6,11 +6,10 @@ interface ResumeItem {
   id: number
   user_id: number
   original_filename: string
-  file_size: number
   file_type: string
   status: string
-  score: number | null
-  best_match_position: string | null
+  ner_extracted_data: Record<string, any> | null
+  vector_id: string | null
   uploaded_at: string
   username: string | null
 }
@@ -22,8 +21,20 @@ const currentPage = ref(1)
 const pageSize = 15
 const statusFilter = ref('')
 const searchUsername = ref('')
+const drawerOpen = ref(false)
+const drawerResume = ref<ResumeItem | null>(null)
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
+
+function openDrawer(resume: ResumeItem) {
+  drawerResume.value = resume
+  drawerOpen.value = true
+}
+
+function closeDrawer() {
+  drawerOpen.value = false
+  drawerResume.value = null
+}
 
 async function fetchResumes() {
   loading.value = true
@@ -55,12 +66,6 @@ watch(statusFilter, () => {
   fetchResumes()
 })
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
-}
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN', {
     year: 'numeric',
@@ -71,11 +76,16 @@ function formatDate(dateStr: string): string {
   })
 }
 
+function formatJson(data: Record<string, any> | null): string {
+  if (!data) return '暂无解析结果'
+  return JSON.stringify(data, null, 2)
+}
+
 function statusLabel(s: string) {
   const map: Record<string, { text: string; class: string }> = {
-    pending: { text: '待分析', class: 'bg-warning-400/15 text-warning-500' },
-    processing: { text: '分析中', class: 'bg-primary-100 text-primary-600' },
-    completed: { text: '已完成', class: 'bg-accent-400/15 text-accent-600' },
+    pending: { text: '待解析', class: 'bg-warning-400/15 text-warning-500' },
+    parsing: { text: '解析中', class: 'bg-primary-100 text-primary-600' },
+    parsed: { text: '已解析', class: 'bg-accent-400/15 text-accent-600' },
     failed: { text: '失败', class: 'bg-danger-400/15 text-danger-600' },
   }
   return map[s] || { text: s, class: 'bg-surface-100 text-surface-500' }
@@ -119,9 +129,9 @@ onMounted(fetchResumes)
         class="px-4 py-2.5 rounded-xl border border-surface-200 bg-surface-50 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40 cursor-pointer"
       >
         <option value="">全部状态</option>
-        <option value="pending">待分析</option>
-        <option value="processing">分析中</option>
-        <option value="completed">已完成</option>
+        <option value="pending">待解析</option>
+        <option value="parsing">解析中</option>
+        <option value="parsed">已解析</option>
         <option value="failed">失败</option>
       </select>
 
@@ -149,10 +159,7 @@ onMounted(fetchResumes)
                 状态
               </th>
               <th class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">
-                评分
-              </th>
-              <th class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">
-                最佳岗位
+                解析结果
               </th>
               <th class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">
                 上传时间
@@ -161,7 +168,7 @@ onMounted(fetchResumes)
           </thead>
           <tbody v-if="loading">
             <tr>
-              <td colspan="6" class="text-center py-16">
+              <td colspan="5" class="text-center py-16">
                 <svg class="animate-spin h-8 w-8 text-primary-400 mx-auto" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -171,7 +178,7 @@ onMounted(fetchResumes)
           </tbody>
           <tbody v-else-if="resumes.length === 0">
             <tr>
-              <td colspan="6" class="text-center py-16">
+              <td colspan="5" class="text-center py-16">
                 <div class="text-4xl mb-3">📭</div>
                 <p class="text-surface-400">暂无简历数据</p>
               </td>
@@ -190,7 +197,7 @@ onMounted(fetchResumes)
                     <p class="text-sm font-medium text-surface-900 truncate max-w-[220px]">
                       {{ resume.original_filename }}
                     </p>
-                    <p class="text-xs text-surface-400">{{ formatSize(resume.file_size) }}</p>
+                    <p class="text-xs text-surface-400">{{ resume.file_type.toUpperCase() }}</p>
                   </div>
                 </div>
               </td>
@@ -206,16 +213,12 @@ onMounted(fetchResumes)
                 </span>
               </td>
               <td class="px-6 py-4">
-                <span v-if="resume.score !== null" class="text-sm font-semibold text-accent-500">
-                  {{ resume.score.toFixed(1) }}
-                </span>
-                <span v-else class="text-sm text-surface-300">-</span>
-              </td>
-              <td class="px-6 py-4">
-                <span v-if="resume.best_match_position" class="text-sm text-surface-700">
-                  {{ resume.best_match_position }}
-                </span>
-                <span v-else class="text-sm text-surface-300">-</span>
+                <button
+                  @click.stop="openDrawer(resume)"
+                  class="px-2.5 py-1 rounded-lg bg-surface-100 hover:bg-surface-200 text-sm text-surface-600 transition-colors"
+                >
+                  查看解析
+                </button>
               </td>
               <td class="px-6 py-4">
                 <span class="text-sm text-surface-500">{{ formatDate(resume.uploaded_at) }}</span>
@@ -245,6 +248,32 @@ onMounted(fetchResumes)
             下一页
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- 解析结果抽屉 -->
+    <div
+      v-if="drawerOpen"
+      class="fixed inset-0 z-50 bg-black/30"
+      @click.self="closeDrawer"
+    >
+      <div class="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl p-6 overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-surface-900">解析结果</h3>
+          <button
+            @click="closeDrawer"
+            class="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-200 text-sm text-surface-600"
+          >
+            关闭
+          </button>
+        </div>
+        <div class="text-sm text-surface-500 mb-3">
+          <span class="font-medium text-surface-700">向量ID：</span>
+          <span>{{ drawerResume?.vector_id || '-' }}</span>
+        </div>
+        <pre class="bg-surface-50 border border-surface-200 rounded-xl p-4 text-xs whitespace-pre-wrap">
+{{ formatJson(drawerResume?.ner_extracted_data || null) }}
+        </pre>
       </div>
     </div>
   </div>

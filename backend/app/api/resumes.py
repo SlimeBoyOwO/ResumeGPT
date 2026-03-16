@@ -58,7 +58,6 @@ async def upload_resume(
         filename=unique_filename,
         original_filename=file.filename or "unknown",
         file_path=str(file_path),
-        file_size=len(content),
         file_type=ext.lstrip("."),
         status="pending",
     )

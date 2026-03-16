@@ -6,11 +6,10 @@ import api from '@/utils/api'
 interface ResumeItem {
   id: number
   original_filename: string
-  file_size: number
   file_type: string
   status: string
-  score: number | null
-  best_match_position: string | null
+  ner_extracted_data: Record<string, any> | null
+  vector_id: string | null
   uploaded_at: string
 }
 
@@ -23,11 +22,23 @@ const uploadError = ref<string | null>(null)
 const uploadSuccess = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const dragOver = ref(false)
+const drawerOpen = ref(false)
+const drawerResume = ref<ResumeItem | null>(null)
 
 const currentPage = ref(1)
 const pageSize = 10
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
+
+function openDrawer(resume: ResumeItem) {
+  drawerResume.value = resume
+  drawerOpen.value = true
+}
+
+function closeDrawer() {
+  drawerOpen.value = false
+  drawerResume.value = null
+}
 
 async function fetchResumes() {
   loading.value = true
@@ -92,12 +103,6 @@ async function handleDelete(id: number) {
   }
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
-}
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN', {
     year: 'numeric',
@@ -108,11 +113,16 @@ function formatDate(dateStr: string): string {
   })
 }
 
+function formatJson(data: Record<string, any> | null): string {
+  if (!data) return '暂无解析结果'
+  return JSON.stringify(data, null, 2)
+}
+
 function statusLabel(s: string) {
   const map: Record<string, { text: string; class: string }> = {
-    pending: { text: '待分析', class: 'bg-warning-400/15 text-warning-500' },
-    processing: { text: '分析中', class: 'bg-primary-100 text-primary-600' },
-    completed: { text: '已完成', class: 'bg-accent-400/15 text-accent-600' },
+    pending: { text: '待解析', class: 'bg-warning-400/15 text-warning-500' },
+    parsing: { text: '解析中', class: 'bg-primary-100 text-primary-600' },
+    parsed: { text: '已解析', class: 'bg-accent-400/15 text-accent-600' },
     failed: { text: '失败', class: 'bg-danger-400/15 text-danger-600' },
   }
   return map[s] || { text: s, class: 'bg-surface-100 text-surface-500' }
@@ -235,7 +245,7 @@ onMounted(fetchResumes)
               {{ resume.original_filename }}
             </p>
             <p class="text-xs text-surface-400 mt-0.5">
-              {{ formatSize(resume.file_size) }} · {{ formatDate(resume.uploaded_at) }}
+              {{ formatDate(resume.uploaded_at) }}
             </p>
           </div>
           <span
@@ -244,10 +254,14 @@ onMounted(fetchResumes)
           >
             {{ statusLabel(resume.status).text }}
           </span>
-          <div class="flex items-center gap-1 text-sm text-surface-400">
-            <span v-if="resume.score !== null" class="mr-2 font-semibold text-accent-500">
-              {{ resume.score.toFixed(1) }}分
-            </span>
+          <div class="flex items-center gap-2 text-sm text-surface-400">
+            <button
+              @click.stop="openDrawer(resume)"
+              class="px-2.5 py-1 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 transition-colors cursor-pointer"
+              title="查看解析结果"
+            >
+              查看解析
+            </button>
             <button
               @click.stop="handleDelete(resume.id)"
               class="p-2 rounded-lg hover:bg-danger-50 hover:text-danger-500 transition-colors cursor-pointer"
@@ -276,6 +290,32 @@ onMounted(fetchResumes)
             下一页
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- 解析结果抽屉 -->
+    <div
+      v-if="drawerOpen"
+      class="fixed inset-0 z-50 bg-black/30"
+      @click.self="closeDrawer"
+    >
+      <div class="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl p-6 overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-surface-900">解析结果</h3>
+          <button
+            @click="closeDrawer"
+            class="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-200 text-sm text-surface-600"
+          >
+            关闭
+          </button>
+        </div>
+        <div class="text-sm text-surface-500 mb-3">
+          <span class="font-medium text-surface-700">向量ID：</span>
+          <span>{{ drawerResume?.vector_id || '-' }}</span>
+        </div>
+        <pre class="bg-surface-50 border border-surface-200 rounded-xl p-4 text-xs whitespace-pre-wrap">
+{{ formatJson(drawerResume?.ner_extracted_data || null) }}
+        </pre>
       </div>
     </div>
   </div>

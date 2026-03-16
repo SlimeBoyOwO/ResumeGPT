@@ -76,6 +76,8 @@ rag_chat_history/
 browser_data/
 # 大模型文件和本地缓存，这些文件过大很大
 models/
+!backend/app/models/
+!backend/app/models/**/*.py
 embedding_models/
 Pytorch/RAG/embedding_models/
 *.safetensors
