@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
     CHAT_API_KEY: str | None = Field(default=None, validation_alias="CHAT_API_KEY")
+    CHAT_API_BASE_URL: str = "https://api.deepseek.com"
+    CHAT_API_MODEL: str = "deepseek-chat"
 
     UPLOAD_DIR: Path = Path(__file__).resolve().parent.parent.parent / "uploads"
     RESUME_UPLOAD_DIR: Path = UPLOAD_DIR / "resumes"

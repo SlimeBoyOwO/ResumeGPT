@@ -1,11 +1,14 @@
 import pdfplumber
 import json
 import os
+from dotenv import load_dotenv
 
 from openai import OpenAI
 
 # 这里以 DeepSeek 为例 (你也可以换成免费的 GLM-4-Flash)
 # 注册即送额度，极度便宜
+
+load_dotenv()
 
 API_KEY = os.environ.get("CHAT_API_KEY", "")
 BASE_URL = "https://api.deepseek.com"

@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,7 @@ from app.models.resume import Resume
 from app.models.user import User
 from app.schemas.common import MessageResponse
 from app.schemas.resume import ResumeResponse, ResumeListResponse
+from app.services.resume_extraction import ExtractionError, extract_resume_data
 
 router = APIRouter(prefix="/api/resumes", tags=["简历"])
 
@@ -59,9 +61,22 @@ async def upload_resume(
         original_filename=file.filename or "unknown",
         file_path=str(file_path),
         file_type=ext.lstrip("."),
-        status="pending",
+        status="parsing",
     )
     db.add(resume)
+    await db.flush()
+    await db.refresh(resume)
+
+    try:
+        extracted_data, _source = await run_in_threadpool(extract_resume_data, str(file_path))
+        resume.ner_extracted_data = extracted_data
+        resume.status = "parsed"
+    except ExtractionError as exc:
+        resume.status = "failed"
+        if exc.partial_data:
+            resume.ner_extracted_data = exc.partial_data
+    except Exception:
+        resume.status = "failed"
     await db.flush()
     await db.refresh(resume)
 
