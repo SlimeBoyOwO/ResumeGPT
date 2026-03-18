@@ -15,3 +15,10 @@ class ExpertResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ExpertOptionResponse(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    system_prompt: str

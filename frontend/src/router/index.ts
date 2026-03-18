@@ -1,17 +1,13 @@
-import { createRouter, createWebHistory } from 'vue-router'
+﻿import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // 认证页面
     {
       path: '/',
       component: () => import('@/layouts/AuthLayout.vue'),
       children: [
-        {
-          path: '',
-          redirect: '/login',
-        },
+        { path: '', redirect: '/login' },
         {
           path: 'login',
           name: 'Login',
@@ -26,8 +22,6 @@ const router = createRouter({
         },
       ],
     },
-
-    // 用户面板
     {
       path: '/',
       component: () => import('@/layouts/MainLayout.vue'),
@@ -47,8 +41,6 @@ const router = createRouter({
         },
       ],
     },
-
-    // 管理员面板
     {
       path: '/admin',
       component: () => import('@/layouts/MainLayout.vue'),
@@ -66,10 +58,14 @@ const router = createRouter({
           component: () => import('@/views/AdminResumesView.vue'),
           meta: { title: '简历管理' },
         },
+        {
+          path: 'jobs',
+          name: 'AdminJobs',
+          component: () => import('@/views/AdminJobsView.vue'),
+          meta: { title: '岗位管理' },
+        },
       ],
     },
-
-    // 404 兜底
     {
       path: '/:pathMatch(.*)*',
       redirect: '/login',
@@ -77,7 +73,6 @@ const router = createRouter({
   ],
 })
 
-// 路由守卫
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('access_token')
   const userRaw = localStorage.getItem('user')
@@ -91,23 +86,14 @@ router.beforeEach((to, _from, next) => {
 
   const isAuthenticated = !!token && !!user
 
-  // 已登录用户访问登录/注册页 → 重定向到首页
   if (to.meta.guest && isAuthenticated) {
-    if (user?.role === 'admin') {
-      return next('/admin')
-    }
+    if (user?.role === 'admin') return next('/admin')
     return next('/dashboard')
   }
 
-  // 需要认证但未登录 → 跳转登录页
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    return next('/login')
-  }
+  if (to.meta.requiresAuth && !isAuthenticated) return next('/login')
 
-  // 需要管理员角色
-  if (to.meta.requiresAdmin && user?.role !== 'admin') {
-    return next('/dashboard')
-  }
+  if (to.meta.requiresAdmin && user?.role !== 'admin') return next('/dashboard')
 
   next()
 })

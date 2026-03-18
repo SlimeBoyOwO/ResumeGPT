@@ -13,7 +13,7 @@ from app.core.database import Base
 class ExpertEvaluation(Base):
     __tablename__ = "expert_evaluations"
     __table_args__ = (
-        UniqueConstraint("match_record_id", "expert_id", name="uk_match_expert"),
+        UniqueConstraint("match_record_id", "node_id", name="uk_match_expert_node"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -21,6 +21,7 @@ class ExpertEvaluation(Base):
         ForeignKey("match_records.id", ondelete="CASCADE"),
         nullable=False,
     )
+    node_id: Mapped[str] = mapped_column(String(50), nullable=False)
     expert_id: Mapped[int] = mapped_column(ForeignKey("experts.id", ondelete="CASCADE"), nullable=False)
     agent_status: Mapped[str] = mapped_column(String(20), default="processing", nullable=False)
     score: Mapped[float | None] = mapped_column(Float, nullable=True)

@@ -23,10 +23,6 @@ class Expert(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    jd_expert_configs: Mapped[list["JdExpertConfig"]] = relationship(  # noqa: F821
-        back_populates="expert",
-        cascade="all, delete-orphan",
-    )
     expert_evaluations: Mapped[list["ExpertEvaluation"]] = relationship(  # noqa: F821
         back_populates="expert",
         cascade="all, delete-orphan",

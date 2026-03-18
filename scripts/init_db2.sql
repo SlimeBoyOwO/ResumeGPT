@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS job_descriptions (
     description TEXT NOT NULL COMMENT '岗位描述与要求摘要',
     vector_id VARCHAR(100) NULL COMMENT 'JD在向量数据库中的ID，用于粗匹配',
     status VARCHAR(20) NOT NULL DEFAULT 'open' COMMENT '状态: open/closed',
+    workflow_graph JSON NULL COMMENT '图节点工作流(包含nodes和edges)',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (enterprise_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_enterprise (enterprise_id)
@@ -56,15 +57,6 @@ CREATE TABLE IF NOT EXISTS experts (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 5. JD - 专家路由与权重配置表 (MoE路由配置)
-CREATE TABLE IF NOT EXISTS jd_expert_configs (
-    jd_id INT NOT NULL,
-    expert_id INT NOT NULL,
-    weight DECIMAL(5,4) NOT NULL DEFAULT 1.0000 COMMENT '该专家在此JD评估中的权重占比 (如 0.4000 表示 40%)',
-    PRIMARY KEY (jd_id, expert_id),
-    FOREIGN KEY (jd_id) REFERENCES job_descriptions(id) ON DELETE CASCADE,
-    FOREIGN KEY (expert_id) REFERENCES experts(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 6. 核心：匹配记录表 (简历投递 & 评估全生命周期)
 CREATE TABLE IF NOT EXISTS match_records (
@@ -87,12 +79,13 @@ CREATE TABLE IF NOT EXISTS match_records (
 CREATE TABLE IF NOT EXISTS expert_evaluations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     match_record_id INT NOT NULL,
-    expert_id INT NOT NULL,
+    node_id VARCHAR(50) NOT NULL COMMENT '图工作流中的节点ID',
+    expert_id INT NOT NULL COMMENT '关联的专家模板ID',
     agent_status VARCHAR(20) NOT NULL DEFAULT 'processing' COMMENT '单个Agent状态: processing / success / failed',
     score FLOAT NULL COMMENT '该专家给出的单项原始评分 (例如0-100分)',
     analysis_content TEXT NULL COMMENT '该专家输出的详细点评与分析理由',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (match_record_id) REFERENCES match_records(id) ON DELETE CASCADE,
     FOREIGN KEY (expert_id) REFERENCES experts(id) ON DELETE CASCADE,
-    UNIQUE KEY uk_match_expert (match_record_id, expert_id) -- 一次匹配中，一个专家只出具一份报告
+    UNIQUE KEY uk_match_expert_node (match_record_id, node_id) -- 一次匹配中，一个节点只出具一份报告
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
