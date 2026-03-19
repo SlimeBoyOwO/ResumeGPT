@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS job_descriptions (
     description TEXT NOT NULL COMMENT '岗位描述与要求摘要',
     vector_id VARCHAR(100) NULL COMMENT 'JD在向量数据库中的ID，用于粗匹配',
     status VARCHAR(20) NOT NULL DEFAULT 'open' COMMENT '状态: open/closed',
+    expected_hires INT NOT NULL DEFAULT 10 COMMENT '预期聘任人数/查阅的简历TopN数量',
     workflow_graph JSON NULL COMMENT '图节点工作流(包含nodes和edges)',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (enterprise_id) REFERENCES users(id) ON DELETE CASCADE,

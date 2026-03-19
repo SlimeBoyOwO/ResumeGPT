@@ -14,6 +14,7 @@ class JobDescriptionCreate(BaseModel):
     description: str = Field(..., min_length=1)
     status: Literal["open", "closed"] = "open"
     auto_select_experts: bool
+    expected_hires: int = Field(10, ge=1)
     workflow_graph: dict[str, Any] | None = None
 
     @model_validator(mode="after")
@@ -40,6 +41,7 @@ class JobDescriptionResponse(BaseModel):
     description: str
     vector_id: str | None = None
     status: str
+    expected_hires: int
     created_at: datetime
     workflow_mode: Literal["manual", "auto_pending"]
     workflow_graph: dict[str, Any] | None = None

@@ -3,7 +3,7 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,9 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
 from app.models.resume import Resume
 from app.models.user import User
+from app.models.match_record import MatchRecord
+from app.models.job_description import JobDescription
+from app.services.rag_service import ingest_resume
 from app.schemas.common import MessageResponse
 from app.schemas.resume import ResumeResponse, ResumeListResponse
 from app.services.resume_extraction import ExtractionError, extract_resume_data
@@ -35,6 +38,7 @@ def _validate_file(file: UploadFile) -> str:
 
 @router.post("/upload", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)
 async def upload_resume(
+    bg_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="简历文件 (PDF/DOCX/图片)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -77,8 +81,11 @@ async def upload_resume(
             resume.ner_extracted_data = exc.partial_data
     except Exception:
         resume.status = "failed"
-    await db.flush()
+    await db.commit()
     await db.refresh(resume)
+
+    if resume.status == "parsed":
+        bg_tasks.add_task(ingest_resume, resume.id)
 
     return ResumeResponse(
         **{k: v for k, v in resume.__dict__.items() if not k.startswith("_")},
@@ -121,6 +128,36 @@ async def list_my_resumes(
             for r in resumes
         ],
     )
+
+
+@router.get("/my-matches")
+async def get_my_matches(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """求职者：获取所有名下简历的初筛 Top JDs"""
+    matches_res = await db.execute(
+        select(MatchRecord, JobDescription)
+        .join(Resume, MatchRecord.resume_id == Resume.id)
+        .join(JobDescription, MatchRecord.jd_id == JobDescription.id)
+        .where(Resume.user_id == current_user.id)
+        .order_by(MatchRecord.final_score.desc())
+        .limit(20)
+    )
+    rows = matches_res.all()
+    results = []
+    for match, jd in rows:
+        results.append({
+            "match_id": match.id,
+            "resume_id": match.resume_id,
+            "jd_id": jd.id,
+            "jd_title": jd.title,
+            "jd_department": jd.department,
+            "workflow_status": match.workflow_status,
+            "vector_similarity": match.vector_similarity,
+            "final_score": match.final_score,
+        })
+    return {"items": results}
 
 
 @router.get("/{resume_id}", response_model=ResumeResponse)

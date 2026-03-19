@@ -31,12 +31,18 @@ const submitting = ref(false)
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
 
+const matchesDrawerOpen = ref(false)
+const currentJdTitle = ref('')
+const matchesList = ref<any[]>([])
+const loadingMatches = ref(false)
+
 const form = reactive({
   title: '',
   department: '',
   description: '',
   status: 'open' as 'open' | 'closed',
   workflowMode: 'manual' as 'manual' | 'auto',
+  expectedHires: 10,
   workflow_graph: { nodes: [], edges: [] } as { nodes: any[]; edges: any[] },
 })
 
@@ -46,6 +52,7 @@ function resetForm() {
   form.description = ''
   form.status = 'open'
   form.workflowMode = 'manual'
+  form.expectedHires = 10
   form.workflow_graph = { nodes: [], edges: [] }
 }
 
@@ -95,6 +102,7 @@ async function submitJob() {
       department: form.department.trim() || null,
       description: form.description.trim(),
       status: form.status,
+      expected_hires: form.expectedHires,
       auto_select_experts: form.workflowMode === 'auto',
       workflow_graph: form.workflowMode === 'manual' ? form.workflow_graph : null,
     }
@@ -107,6 +115,20 @@ async function submitJob() {
     error.value = err.response?.data?.detail || '创建 JD 失败，请重试。'
   } finally {
     submitting.value = false
+  }
+}
+
+async function viewMatches(job: JobItem) {
+  currentJdTitle.value = job.title
+  matchesDrawerOpen.value = true
+  loadingMatches.value = true
+  try {
+    const { data } = await api.get(`/job-descriptions/${job.id}/matches`)
+    matchesList.value = data.items || []
+  } catch (err) {
+    console.error(err)
+  } finally {
+    loadingMatches.value = false
   }
 }
 
@@ -164,6 +186,13 @@ onMounted(async () => {
           </select>
         </div>
       </div>
+      
+      <div class="grid grid-cols-1 gap-4">
+        <div>
+          <label class="block text-sm text-surface-600 mb-1">查阅简历数量 (筛出TopN名)</label>
+          <input v-model.number="form.expectedHires" type="number" min="1" max="100" class="w-full px-3 py-2 rounded-lg border border-surface-200" />
+        </div>
+      </div>
 
       <div>
         <label class="block text-sm text-surface-600 mb-1">岗位描述</label>
@@ -218,6 +247,12 @@ onMounted(async () => {
               <p>状态：{{ job.status }}</p>
               <p>模式：{{ job.workflow_mode }}</p>
               <p>节点总数：{{ job.workflow_graph?.nodes?.length || 0 }}</p>
+              <button
+                @click="viewMatches(job)"
+                class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition font-medium"
+              >
+                📊 查看初筛匹配
+              </button>
             </div>
           </div>
           <p class="text-sm text-surface-700 mt-3 whitespace-pre-wrap">{{ job.description }}</p>
@@ -230,6 +265,72 @@ onMounted(async () => {
             >
               {{ node.label || `节点#${node.data?.expert_id}` }}
             </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Matches 抽屉 -->
+    <div
+      v-if="matchesDrawerOpen"
+      class="fixed inset-0 z-50 bg-black/30"
+      @click.self="matchesDrawerOpen = false"
+    >
+      <div class="absolute right-0 top-0 h-full w-full max-w-2xl bg-surface-50 shadow-xl p-6 overflow-y-auto flex flex-col">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-bold text-surface-900 flex items-center gap-2">
+            <span>📊</span> 初筛匹配结果 - {{ currentJdTitle }}
+          </h3>
+          <button
+            @click="matchesDrawerOpen = false"
+            class="px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-sm text-surface-700 transition"
+          >
+            关闭
+          </button>
+        </div>
+
+        <div v-if="loadingMatches" class="py-12 flex flex-col items-center justify-center">
+          <svg class="animate-spin h-8 w-8 text-primary-500 mb-4" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p class="text-surface-500 animate-pulse">正在向量库中检索匹配的简历...</p>
+        </div>
+        
+        <div v-else-if="matchesList.length === 0" class="py-12 flex flex-col justify-center items-center text-center opacity-70">
+          <div class="text-5xl mb-4">📭</div>
+          <p class="text-surface-700 font-medium">暂无匹配的候选人</p>
+          <p class="text-sm text-surface-400 mt-1">目前向量库中没有与之匹配度较高的简历数据</p>
+        </div>
+
+        <div v-else class="space-y-4 flex-1">
+          <div v-for="match in matchesList" :key="match.match_id" class="p-4 bg-white border border-surface-200 rounded-xl shadow-sm hover:border-primary-300 transition-colors">
+            <div class="flex justify-between items-start mb-2">
+              <div>
+                <h4 class="font-bold text-surface-900 text-base">{{ match.resume_name }}</h4>
+                <p class="text-xs text-surface-500 mt-1">文件: {{ match.resume_filename }}</p>
+              </div>
+              <div class="text-right">
+                <span class="text-2xl font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded-lg border border-primary-200">{{ match.final_score }}</span>
+                <p class="text-[10px] text-surface-400 mt-1">综合得分</p>
+              </div>
+            </div>
+            
+            <div class="space-y-2 mt-4">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-surface-600">语义相似度 (余弦向量)</span>
+                  <span class="font-medium text-surface-800">{{ match.vector_similarity || 0 }}分</span>
+                </div>
+                <div class="w-full bg-surface-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-accent-400 h-1.5" :style="`width: ${match.vector_similarity || 0}%`"></div>
+                </div>
+              </div>
+              <div class="text-[11px] text-surface-400 mt-3 flex justify-between border-t border-surface-100 pt-2">
+                <span>当前进度：{{ match.workflow_status }}</span>
+                <span>匹配ID：{{ match.match_id }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

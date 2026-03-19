@@ -25,6 +25,7 @@ class JobDescription(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     vector_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
+    expected_hires: Mapped[int] = mapped_column(default=10, nullable=False)
     workflow_graph: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

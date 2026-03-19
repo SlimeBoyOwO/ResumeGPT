@@ -25,6 +25,10 @@ const dragOver = ref(false)
 const drawerOpen = ref(false)
 const drawerResume = ref<ResumeItem | null>(null)
 
+const matchesDrawerOpen = ref(false)
+const matchesList = ref<any[]>([])
+const loadingMatches = ref(false)
+
 const currentPage = ref(1)
 const pageSize = 10
 
@@ -103,6 +107,19 @@ async function handleDelete(id: number) {
   }
 }
 
+async function fetchMyMatches() {
+  matchesDrawerOpen.value = true
+  loadingMatches.value = true
+  try {
+    const { data } = await api.get('/resumes/my-matches')
+    matchesList.value = data.items || []
+  } catch (err) {
+    console.error(err)
+  } finally {
+    loadingMatches.value = false
+  }
+}
+
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN', {
     year: 'numeric',
@@ -143,6 +160,14 @@ onMounted(fetchResumes)
       <div>
         <h1 class="text-2xl font-bold text-surface-900">我的简历</h1>
         <p class="text-surface-500 mt-1">管理和上传您的简历文件</p>
+      </div>
+      <div>
+        <button
+          @click="fetchMyMatches"
+          class="px-4 py-2 rounded-xl bg-accent-50 text-accent-700 hover:bg-accent-100 font-medium text-sm transition-colors flex items-center gap-2"
+        >
+          <span>🎯</span> 查看推荐岗位 (Top Matches)
+        </button>
       </div>
     </div>
 
@@ -316,6 +341,67 @@ onMounted(fetchResumes)
         <pre class="bg-surface-50 border border-surface-200 rounded-xl p-4 text-xs whitespace-pre-wrap">
 {{ formatJson(drawerResume?.ner_extracted_data || null) }}
         </pre>
+      </div>
+    </div>
+
+    <!-- Top Matches 抽屉 -->
+    <div
+      v-if="matchesDrawerOpen"
+      class="fixed inset-0 z-50 bg-black/30"
+      @click.self="matchesDrawerOpen = false"
+    >
+      <div class="absolute right-0 top-0 h-full w-full max-w-lg bg-surface-50 shadow-xl p-6 overflow-y-auto flex flex-col">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-bold text-surface-900 flex items-center gap-2">
+            <span>🎯</span> 智能推荐岗位
+          </h3>
+          <button
+            @click="matchesDrawerOpen = false"
+            class="px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-sm text-surface-700 transition"
+          >
+            关闭
+          </button>
+        </div>
+
+        <div v-if="loadingMatches" class="py-12 flex flex-col items-center justify-center">
+          <svg class="animate-spin h-8 w-8 text-primary-500 mb-4" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p class="text-surface-500 animate-pulse">正在向量库中检索匹配的岗位...</p>
+        </div>
+        
+        <div v-else-if="matchesList.length === 0" class="py-12 flex flex-col justify-center items-center text-center opacity-70">
+          <div class="text-5xl mb-4">📭</div>
+          <p class="text-surface-700 font-medium">暂无匹配的岗位</p>
+          <p class="text-sm text-surface-400 mt-1">请上传更完善的简历或等待HR发布新岗位</p>
+        </div>
+
+        <div v-else class="space-y-4 flex-1">
+          <div v-for="match in matchesList" :key="match.match_id" class="p-4 bg-white border border-surface-200 rounded-xl shadow-sm hover:border-primary-300 transition-colors">
+            <div class="flex justify-between items-start mb-2">
+              <h4 class="font-bold text-surface-900 text-base flex-1">{{ match.jd_title }}</h4>
+              <span class="text-2xl font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded-lg border border-primary-200">{{ match.final_score }}</span>
+            </div>
+            <p class="text-xs text-surface-500 mb-3">{{ match.jd_department || '未提供部门' }}</p>
+            
+            <div class="space-y-2">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-surface-600">语义相似度 (向量得分)</span>
+                  <span class="font-medium text-surface-800">{{ match.vector_similarity || 0 }}分</span>
+                </div>
+                <div class="w-full bg-surface-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-accent-400 h-1.5" :style="`width: ${match.vector_similarity || 0}%`"></div>
+                </div>
+              </div>
+              <div class="text-[11px] text-surface-400 mt-2 flex justify-between border-t border-surface-100 pt-2">
+                <span>匹配状态：{{ match.workflow_status }}</span>
+                <span>简历ID：{{ match.resume_id }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

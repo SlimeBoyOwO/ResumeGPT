@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,7 +13,10 @@ from app.core.database import get_db
 from app.core.security import require_admin
 from app.models.expert import Expert
 from app.models.job_description import JobDescription
+from app.models.match_record import MatchRecord
+from app.models.resume import Resume
 from app.models.user import User
+from app.services.rag_service import ingest_job_description
 from app.schemas.job_description import (
     JobDescriptionCreate,
     JobDescriptionListResponse,
@@ -32,6 +35,7 @@ def _to_response(item: JobDescription) -> JobDescriptionResponse:
         description=item.description,
         vector_id=item.vector_id,
         status=item.status,
+        expected_hires=item.expected_hires,
         created_at=item.created_at,
         workflow_mode="manual" if item.workflow_graph else "auto_pending",
         workflow_graph=item.workflow_graph,
@@ -41,6 +45,7 @@ def _to_response(item: JobDescription) -> JobDescriptionResponse:
 @router.post("/", response_model=JobDescriptionResponse, status_code=status.HTTP_201_CREATED)
 async def create_job_description(
     body: JobDescriptionCreate,
+    bg_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(require_admin),
 ):
@@ -66,15 +71,49 @@ async def create_job_description(
         department=body.department,
         description=body.description,
         status=body.status,
+        expected_hires=body.expected_hires,
         workflow_graph=body.workflow_graph if not body.auto_select_experts else None,
     )
     db.add(jd)
-    await db.flush()
+    await db.commit()
+    await db.refresh(jd)
+    
+    bg_tasks.add_task(ingest_job_description, jd.id)
+    return _to_response(jd)
 
-    # Re-fetch the saved object to refresh fields from db
-    result = await db.execute(select(JobDescription).where(JobDescription.id == jd.id))
-    created = result.scalar_one()
-    return _to_response(created)
+@router.get("/{id}/matches")
+async def get_job_matches(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    jd_res = await db.execute(select(JobDescription).where(JobDescription.id == id, JobDescription.enterprise_id == admin_user.id))
+    jd = jd_res.scalar_one_or_none()
+    if not jd:
+        raise HTTPException(status_code=404, detail="JD not found or no access.")
+
+    # Get top expected_hires match records
+    matches_res = await db.execute(
+        select(MatchRecord, Resume)
+        .join(Resume, MatchRecord.resume_id == Resume.id)
+        .where(MatchRecord.jd_id == id)
+        .order_by(MatchRecord.final_score.desc())
+        .limit(jd.expected_hires)
+    )
+    rows = matches_res.all()
+    
+    results = []
+    for match, resume in rows:
+        results.append({
+            "match_id": match.id,
+            "workflow_status": match.workflow_status,
+            "vector_similarity": match.vector_similarity,
+            "final_score": match.final_score,
+            "resume_id": resume.id,
+            "resume_name": resume.ner_extracted_data.get("姓名", "未知") if resume.ner_extracted_data else "未知",
+            "resume_filename": resume.original_filename
+        })
+    return {"items": results}
 
 
 @router.get("/", response_model=JobDescriptionListResponse)

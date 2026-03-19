@@ -1,4 +1,5 @@
 ﻿"""ResumeGPT backend entrypoint."""
+import logging
 
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.services.expert_seed import seed_default_experts
 
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
