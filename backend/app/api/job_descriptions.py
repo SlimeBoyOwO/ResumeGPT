@@ -22,6 +22,8 @@ from app.schemas.job_description import (
     JobDescriptionListResponse,
     JobDescriptionResponse,
 )
+from app.models.expert_evaluation import ExpertEvaluation
+from app.models.expert import Expert
 
 router = APIRouter(prefix="/api/job-descriptions", tags=["job-descriptions"])
 
@@ -109,11 +111,40 @@ async def get_job_matches(
             "workflow_status": match.workflow_status,
             "vector_similarity": match.vector_similarity,
             "final_score": match.final_score,
+            "ability_summary": match.ability_summary,
             "resume_id": resume.id,
             "resume_name": resume.ner_extracted_data.get("姓名", "未知") if resume.ner_extracted_data else "未知",
             "resume_filename": resume.original_filename
         })
     return {"items": results}
+
+@router.get("/matches/{match_id}/evaluations")
+async def get_match_evaluations(
+    match_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    """获取某次匹配的所有专家评价记录"""
+    query = (
+        select(ExpertEvaluation, Expert.name)
+        .join(Expert, ExpertEvaluation.expert_id == Expert.id)
+        .where(ExpertEvaluation.match_record_id == match_id)
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    
+    evals = []
+    for ev, expert_name in rows:
+        evals.append({
+            "id": ev.id,
+            "node_id": ev.node_id,
+            "expert_name": expert_name,
+            "status": ev.agent_status,
+            "score": ev.score,
+            "analysis_content": ev.analysis_content,
+            "created_at": ev.created_at
+        })
+    return {"items": evals}
 
 
 @router.get("/", response_model=JobDescriptionListResponse)

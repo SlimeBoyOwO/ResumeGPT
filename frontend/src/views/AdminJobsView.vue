@@ -3,6 +3,8 @@ import { onMounted, reactive, ref } from 'vue'
 import api from '@/utils/api'
 import ExpertGraphEditor from '@/components/ExpertGraphEditor.vue'
 
+import * as echarts from 'echarts'
+
 interface ExpertOption {
   id: number
   name: string
@@ -35,6 +37,12 @@ const matchesDrawerOpen = ref(false)
 const currentJdTitle = ref('')
 const matchesList = ref<any[]>([])
 const loadingMatches = ref(false)
+
+const evaluationsDrawerOpen = ref(false)
+const selectedMatchForEvals = ref<any>(null)
+const expertEvaluations = ref<any[]>([])
+const loadingEvals = ref(false)
+let currentChartInstance: echarts.EChartsType | null = null
 
 const form = reactive({
   title: '',
@@ -130,6 +138,80 @@ async function viewMatches(job: JobItem) {
   } finally {
     loadingMatches.value = false
   }
+}
+
+async function viewEvaluations(match: any) {
+  selectedMatchForEvals.value = match
+  evaluationsDrawerOpen.value = true
+  loadingEvals.value = true
+  expertEvaluations.value = []
+  
+  try {
+    const { data } = await api.get(`/job-descriptions/matches/${match.match_id}/evaluations`)
+    expertEvaluations.value = data.items || []
+  } catch (err) {
+    console.error(err)
+  } finally {
+    loadingEvals.value = false
+    // Render radar chart if available
+    setTimeout(() => {
+      renderRadarChart(match.ability_summary)
+    }, 100)
+  }
+}
+
+function renderRadarChart(summary: Record<string, number> | null) {
+  const container = document.getElementById('radar-chart-container')
+  if (!container) return
+  if (currentChartInstance) {
+    currentChartInstance.dispose()
+  }
+  
+  if (!summary) {
+    container.innerHTML = '<div class="flex h-full items-center justify-center text-surface-400">能力图暂未生成</div>'
+    return
+  }
+
+  const chart = echarts.init(container)
+  currentChartInstance = chart
+  
+  const indicator = [
+    { name: '专业技能', max: 100 },
+    { name: '业务经验', max: 100 },
+    { name: '学习与潜力', max: 100 },
+    { name: '沟通与协作', max: 100 },
+    { name: '抗压与稳定性', max: 100 },
+    { name: '岗位匹配度', max: 100 }
+  ]
+  
+  const values = indicator.map(ind => summary[ind.name] || 0)
+  
+  const option = {
+    radar: {
+      indicator: indicator,
+      radius: '65%',
+      axisName: {
+        color: '#64748b',
+        fontSize: 12
+      },
+      splitArea: {
+        areaStyle: {
+          color: ['#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1']
+        }
+      }
+    },
+    series: [{
+      type: 'radar',
+      data: [{
+        value: values,
+        name: '能力评估',
+        itemStyle: { color: '#0ea5e9' },
+        areaStyle: { color: 'rgba(14, 165, 233, 0.4)' },
+        lineStyle: { width: 2 }
+      }]
+    }]
+  }
+  chart.setOption(option)
 }
 
 function formatDate(dateStr: string) {
@@ -311,7 +393,7 @@ onMounted(async () => {
                 <p class="text-xs text-surface-500 mt-1">文件: {{ match.resume_filename }}</p>
               </div>
               <div class="text-right">
-                <span class="text-2xl font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded-lg border border-primary-200">{{ match.final_score }}</span>
+                <span class="text-2xl font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded-lg border border-primary-200">{{ match.final_score ?? '-' }}</span>
                 <p class="text-[10px] text-surface-400 mt-1">综合得分</p>
               </div>
             </div>
@@ -326,9 +408,70 @@ onMounted(async () => {
                   <div class="bg-accent-400 h-1.5" :style="`width: ${match.vector_similarity || 0}%`"></div>
                 </div>
               </div>
-              <div class="text-[11px] text-surface-400 mt-3 flex justify-between border-t border-surface-100 pt-2">
-                <span>当前进度：{{ match.workflow_status }}</span>
-                <span>匹配ID：{{ match.match_id }}</span>
+              <div class="text-[11px] text-surface-400 mt-3 flex items-center justify-between border-t border-surface-100 pt-3">
+                <span class="px-2 py-1 bg-surface-100 rounded-md font-medium" :class="{'text-accent-600 bg-accent-50': match.workflow_status === 'completed'}">当前进度：{{ match.workflow_status }}</span>
+                <button
+                  v-if="match.workflow_status === 'completed' || match.workflow_status === 'agent_evaluating'"
+                  @click="viewEvaluations(match)"
+                  class="px-3 py-1.5 bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-lg transition-colors font-medium cursor-pointer"
+                >
+                  查看详评分析
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Evals Drawer -->
+    <div
+      v-if="evaluationsDrawerOpen"
+      class="fixed inset-0 z-[60] bg-black/40 flex"
+      @click.self="evaluationsDrawerOpen = false"
+    >
+      <div class="ml-auto w-full max-w-xl h-full bg-surface-50 shadow-2xl flex flex-col p-6 overflow-hidden animate-slide-in-right">
+        <div class="flex items-center justify-between mb-4 border-b border-surface-200 pb-4 shrink-0">
+          <div>
+            <h3 class="text-xl font-bold text-surface-900 flex items-center gap-2">
+              <span>📑</span> 综合评价报告
+            </h3>
+            <p class="text-sm text-surface-500 mt-1">{{ selectedMatchForEvals?.resume_name }} 的多维度审核结果</p>
+          </div>
+          <button
+            @click="evaluationsDrawerOpen = false"
+            class="p-2 rounded-xl bg-surface-200 hover:bg-surface-300 text-surface-700 transition"
+          >
+            ❌ 关闭
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto pr-2 space-y-6">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-surface-100">
+            <h4 class="font-bold text-surface-800 mb-3 text-sm flex items-center gap-1.5">
+              <span class="w-1.5 h-4 bg-primary-500 rounded-full inline-block"></span>
+              六维度能力雷达图
+            </h4>
+            <div id="radar-chart-container" class="w-full h-64"></div>
+          </div>
+          
+          <div class="space-y-4">
+            <h4 class="font-bold text-surface-800 text-sm flex items-center gap-1.5">
+              <span class="w-1.5 h-4 bg-accent-500 rounded-full inline-block"></span>
+              专家网络独立评审记录
+            </h4>
+            <div v-if="loadingEvals" class="py-10 text-center text-surface-400">加载评审数据中...</div>
+            <div v-else-if="expertEvaluations.length === 0" class="text-xs text-center text-surface-400 py-6">暂无评价记录</div>
+            <div v-else class="space-y-3">
+              <div v-for="ev in expertEvaluations" :key="ev.id" class="p-4 bg-white border-l-4 border-l-blue-400 rounded-lg shadow-sm">
+                <div class="flex justify-between items-center mb-2">
+                  <span class="font-bold text-surface-800 text-[15px]">{{ ev.expert_name }}</span>
+                  <span class="text-lg font-black text-blue-600">{{ ev.score }}分</span>
+                </div>
+                <div class="text-xs text-surface-500 bg-surface-50 p-2 rounded whitespace-pre-wrap leading-relaxed">
+                  {{ ev.analysis_content }}
+                </div>
+                <div class="text-[10px] text-surface-400 mt-2 text-right">评估于 {{ formatDate(ev.created_at) }}</div>
               </div>
             </div>
           </div>

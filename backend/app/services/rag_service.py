@@ -84,7 +84,10 @@ async def ingest_resume(resume_id: int):
     logger.info(f"Starting ingest_resume for ID {resume_id}")
     try:
         if not model or not resume_col:
-            logger.error("RAG logic aborted: model or resume_col is None.")
+            if not model:
+                logger.error("RAG logic aborted: model is None.")
+            if not resume_col:
+                logger.error("RAG logic aborted: resume_col is None.")
             return
 
         async with async_session_factory() as session:
@@ -116,6 +119,16 @@ async def ingest_resume(resume_id: int):
             await _match_resume_to_all_jds(session, resume_id, embedding, edu_val)
     except Exception as e:
         logger.error(f"CRASH in ingest_resume: {e}", exc_info=True)
+        
+    # Trigger fine screening for affected JDs
+    try:
+        from app.services.workflow_engine import auto_trigger_fine_screening
+        async with async_session_factory() as session:
+            jd_ids = await session.execute(select(MatchRecord.jd_id).where(MatchRecord.resume_id == resume_id))
+            for jd_id in set(jd_ids.scalars().all()):
+                await auto_trigger_fine_screening(jd_id)
+    except Exception as e:
+        logger.error(f"Trigger failed: {e}", exc_info=True)
 
 
 async def ingest_job_description(jd_id: int):
@@ -152,6 +165,13 @@ async def ingest_job_description(jd_id: int):
             await _match_jd_to_all_resumes(session, jd, embedding)
     except Exception as e:
         logger.error(f"CRASH in ingest_job_description: {e}", exc_info=True)
+        
+    # Trigger fine screening for this JD
+    try:
+        from app.services.workflow_engine import auto_trigger_fine_screening
+        await auto_trigger_fine_screening(jd_id)
+    except Exception as e:
+        logger.error(f"Trigger failed: {e}", exc_info=True)
 
 
 async def _match_resume_to_all_jds(session: AsyncSession, resume_id: int, resume_embedding: list[float], resume_edu_val: int):
