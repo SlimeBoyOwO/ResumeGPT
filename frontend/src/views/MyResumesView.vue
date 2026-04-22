@@ -108,6 +108,19 @@ async function handleDelete(id: number) {
   }
 }
 
+async function viewOriginalFile(resume: ResumeItem) {
+  try {
+    const response = await api.get(`/resumes/${resume.id}/file`, {
+      responseType: 'blob'
+    })
+    const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  } catch (err) {
+    alert('无法获取原文件，文件可能不存在或已损坏。')
+  }
+}
+
 async function fetchMyMatches() {
   matchesDrawerOpen.value = true
   loadingMatches.value = true
@@ -258,6 +271,11 @@ onMounted(fetchResumes)
             {{ statusLabel(resume.status).text }}
           </span>
           <div class="flex items-center gap-2 text-sm text-surface-400">
+            <button @click.stop="viewOriginalFile(resume)"
+              class="px-2.5 py-1 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 transition-colors cursor-pointer"
+              title="查看原文件">
+              查看原文件
+            </button>
             <button @click.stop="openDrawer(resume)"
               class="px-2.5 py-1 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 transition-colors cursor-pointer"
               title="查看解析结果">

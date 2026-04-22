@@ -62,6 +62,19 @@ function handleSearch() {
   fetchResumes()
 }
 
+async function viewOriginalFile(resume: ResumeItem) {
+  try {
+    const response = await api.get(`/resumes/${resume.id}/file`, {
+      responseType: 'blob'
+    })
+    const blob = new Blob([response.data], { type: response.headers['content-type'] || 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  } catch (err) {
+    alert('无法获取原文件，文件可能不存在或已损坏。')
+  }
+}
+
 watch(statusFilter, () => {
   currentPage.value = 1
   fetchResumes()
@@ -235,7 +248,13 @@ onMounted(fetchResumes)
                   {{ statusLabel(resume.status).text }}
                 </span>
               </td>
-              <td class="px-6 py-4">
+              <td class="px-6 py-4 flex items-center gap-2">
+                <button
+                  @click.stop="viewOriginalFile(resume)"
+                  class="px-2.5 py-1 rounded-lg bg-surface-100 hover:bg-surface-200 text-sm text-surface-600 transition-colors"
+                >
+                  查看原文件
+                </button>
                 <button
                   @click.stop="openDrawer(resume)"
                   class="px-2.5 py-1 rounded-lg bg-surface-100 hover:bg-surface-200 text-sm text-surface-600 transition-colors"

@@ -4,17 +4,16 @@ import json
 import logging
 from collections import defaultdict, deque
 import asyncio
-from typing import Any
 
 from openai import AsyncOpenAI
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import async_session_factory
 from app.models.job_description import JobDescription
 from app.models.match_record import MatchRecord
 from app.models.resume import Resume
+from app.models.expert import Expert
 from app.models.expert_evaluation import ExpertEvaluation
 
 logger = logging.getLogger(__name__)
@@ -36,10 +35,10 @@ async def auto_trigger_fine_screening(jd_id: int):
                 return
             
             top_n = jd.expected_hires
-            # Fetch top N resumes >= 85
+            # Fetch top N resumes >= 80
             query = (
                 select(MatchRecord)
-                .where(MatchRecord.jd_id == jd_id, MatchRecord.vector_similarity >= 85)
+                .where(MatchRecord.jd_id == jd_id, MatchRecord.vector_similarity >= 80)
                 .order_by(MatchRecord.vector_similarity.desc())
                 .limit(top_n)
             )
@@ -97,22 +96,24 @@ async def run_workflow_for_match(match_id: int):
                     adj[u].append(v)
                     in_degree[v] += 1
             
+            # Pre-extract plain data to avoid lazy-load issues across sessions
+            jd_description = jd.description
+            resume_ner_data = resume.ner_extracted_data
+
             # 2. Execute Topologically
             queue = deque([n_id for n_id, deg in in_degree.items() if deg == 0])
             node_outputs = {} # {id: (score, evaluation_text)}
 
             while queue:
-                # For simplicity in this implementation, we run ready nodes in parallel
                 batch_nodes = list(queue)
                 queue.clear()
-                
+
                 tasks = [
-                    _execute_expert_node(session, match_id, jd, resume, node_map[n_id], adj, node_outputs)
+                    _execute_expert_node(match_id, jd_description, resume_ner_data, node_map[n_id], adj, node_outputs)
                     for n_id in batch_nodes
                 ]
                 batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Apply results and unblock children
+
                 for i, n_id in enumerate(batch_nodes):
                     res = batch_results[i]
                     if isinstance(res, Exception):
@@ -129,17 +130,17 @@ async def run_workflow_for_match(match_id: int):
             # 3. Calculate Final Score & Weights
             total_weight = 0.0
             weighted_score_sum = 0.0
-            
+
             for n_id, n_data in node_map.items():
                 weight = float(n_data.get('data', {}).get('weight', 1.0))
                 score, _ = node_outputs.get(n_id, (0, ""))
                 weighted_score_sum += score * weight
                 total_weight += weight
-                
+
             final_score = round(weighted_score_sum / total_weight, 2) if total_weight > 0 else 0.0
 
             # 4. Generate Radar Chart
-            radar_json = await _generate_radar_chart(jd, resume, node_outputs, node_map)
+            radar_json = await _generate_radar_chart(jd_description, resume_ner_data, node_outputs, node_map)
 
             # 5. Update Match Record
             match.final_score = final_score
@@ -157,26 +158,50 @@ async def run_workflow_for_match(match_id: int):
                 await session.commit()
 
 
-async def _execute_expert_node(session: AsyncSession, match_id: int, jd: JobDescription, resume: Resume, node: dict, adj: dict, node_outputs: dict) -> tuple[float, str]:
+async def _execute_expert_node(match_id: int, jd_description: str, resume_ner_data: dict | None, node: dict, adj: dict, node_outputs: dict) -> tuple[float, str]:
     expert_id = node.get("data", {}).get("expert_id", 0)
-    system_prompt = node.get("data", {}).get("system_prompt", "你是一个资深面试官，请打分评价。")
+    system_prompt = "你是一个资深面试官，请打分评价。"
+    if expert_id:
+        async with async_session_factory() as db:
+            expert = await db.get(Expert, expert_id)
+            if expert:
+                system_prompt = expert.system_prompt
     node_name = node.get("label", "专家")
-    
+
     # Reconstruct Context
     base_info = "简历信息:\n"
-    base_info += json.dumps(resume.ner_extracted_data, ensure_ascii=False) if resume.ner_extracted_data else "无"
-    
-    # Predecessor evaluations
-    # Technically adj is u -> v. We need v -> u (parents). Handled simply by passing EVERYTHING previously completed if we don't build a reverse map, 
-    # but strictly it should be ALL predecessors. Let's just feed the whole accumulated context as "前置专家评价"
+
+    # Handle PII Desensitization
+    orig_name = resume_ner_data.get("姓名") if resume_ner_data else None
+    orig_phone = resume_ner_data.get("电话") if resume_ner_data else None
+
+    def mask_pii(text: str) -> str:
+        masked = text
+        if orig_name:
+            masked = masked.replace(orig_name, "张三")
+        if orig_phone:
+            masked = masked.replace(orig_phone, "10086114514")
+        return masked
+
+    def unmask_pii(text: str) -> str:
+        unmasked = text
+        if orig_name:
+            unmasked = unmasked.replace("张三", orig_name)
+        if orig_phone:
+            unmasked = unmasked.replace("10086114514", orig_phone)
+        return unmasked
+
+    resume_data_str = json.dumps(resume_ner_data, ensure_ascii=False) if resume_ner_data else "无"
+    base_info += mask_pii(resume_data_str)
+
     previous_evals = []
     for p_id, (p_score, p_eval) in node_outputs.items():
          previous_evals.append(f"【前面的专家点评】{p_score}分: {p_eval}")
-    
-    if previous_evals:
-        base_info += "\n\n其它前置考核评价：\n" + "\n".join(previous_evals)
 
-    llm_prompt = f"岗位要求：\n{jd.description}\n\n候选人资料：\n{base_info}\n\n请按照系统提示要求进行评价，结果必须为JSON格式，包含 'score'(0-100的纯数字) 和 'evaluation'(你的详细文字点评)。"
+    if previous_evals:
+        base_info += "\n\n其它前置考核评价：\n" + mask_pii("\n".join(previous_evals))
+
+    llm_prompt = f"岗位要求：\n{jd_description}\n\n候选人资料：\n{base_info}\n\n请按照系统提示要求进行评价，结果必须为JSON格式，包含 'score'(0-100的纯数字) 和 'evaluation'(你的详细文字点评)。"
 
     client = _get_async_client()
     try:
@@ -193,35 +218,68 @@ async def _execute_expert_node(session: AsyncSession, match_id: int, jd: JobDesc
         res_json = json.loads(res_text)
         score = float(res_json.get("score", 0))
         evaluation = str(res_json.get("evaluation", res_text))
+        evaluation = unmask_pii(evaluation)
     except Exception as e:
         logger.error(f"Node {node['id']} LLM failure: {e}")
         score = 0.0
         evaluation = f"LLM调用失败或返回格式解析出错。原因: {e}"
 
-    # Save to Table expert_evaluations
-    evaluation_record = ExpertEvaluation(
-        match_record_id=match_id,
-        node_id=node["id"],
-        expert_id=expert_id,
-        agent_status="success",
-        score=score,
-        analysis_content=evaluation
-    )
-    session.add(evaluation_record)
-    await session.commit()
+    # Save to DB with its own session
+    async with async_session_factory() as db:
+        query = select(ExpertEvaluation).where(
+            ExpertEvaluation.match_record_id == match_id,
+            ExpertEvaluation.node_id == node["id"]
+        )
+        result = await db.execute(query)
+        existing_record = result.scalar_one_or_none()
+
+        if existing_record:
+            existing_record.expert_id = expert_id
+            existing_record.agent_status = "success"
+            existing_record.score = score
+            existing_record.analysis_content = evaluation
+        else:
+            evaluation_record = ExpertEvaluation(
+                match_record_id=match_id,
+                node_id=node["id"],
+                expert_id=expert_id,
+                agent_status="success",
+                score=score,
+                analysis_content=evaluation
+            )
+            db.add(evaluation_record)
+
+        await db.commit()
 
     return score, evaluation
 
 
-async def _generate_radar_chart(jd: JobDescription, resume: Resume, node_outputs: dict, node_map: dict) -> dict:
+async def _generate_radar_chart(jd_description: str, resume_ner_data: dict | None, node_outputs: dict, node_map: dict) -> dict:
     """Generate 6-dimension JSON radar data."""
     client = _get_async_client()
+
+    summary_context = f"岗位描述：\n{jd_description}\n\n"
+
+    # Handle PII Desensitization
+    orig_name = resume_ner_data.get("姓名") if resume_ner_data else None
+    orig_phone = resume_ner_data.get("电话") if resume_ner_data else None
+
+    def mask_pii(text: str) -> str:
+        masked = text
+        if orig_name:
+            masked = masked.replace(orig_name, "张三")
+        if orig_phone:
+            masked = masked.replace(orig_phone, "10086114514")
+        return masked
+
+    resume_data_str = json.dumps(resume_ner_data, ensure_ascii=False) if resume_ner_data else "无"
+    summary_context += f"简历信息：\n{mask_pii(resume_data_str)}\n\n"
     
-    summary_context = f"岗位描述：\n{jd.description}\n\n"
-    summary_context += f"简历信息：\n{json.dumps(resume.ner_extracted_data, ensure_ascii=False)}\n\n"
-    summary_context += "各专家模块评分与点评汇总：\n"
+    eval_text_sum = ""
     for n_id, (score, eval_text) in node_outputs.items():
-        summary_context += f"[{node_map[n_id]['label']}] 得分:{score}, 点评:{eval_text}\n"
+        eval_text_sum += f"[{node_map[n_id]['label']}] 得分:{score}, 点评:{eval_text}\n"
+    
+    summary_context += "各专家模块评分与点评汇总：\n" + mask_pii(eval_text_sum)
 
     system_msg = """
 你是一个人力资源专家。请综合上方所有资料和评价，对候选人生成一个 6 维度的雷达能力图数据，并以JSON格式严格输出。

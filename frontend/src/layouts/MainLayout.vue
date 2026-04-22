@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -11,7 +11,8 @@ const navItems = computed(() => {
     return [
       { label: '管理面板', path: '/admin', icon: '🧭' },
       { label: '简历管理', path: '/admin/resumes', icon: '📄' },
-      { label: '岗位管理', path: '/admin/jobs', icon: '🧩' },
+      { label: '创建 JD', path: '/admin/jobs/create', icon: '➕' },
+      { label: 'JD 列表', path: '/admin/jobs/list', icon: '🧩' },
     ]
   }
   return [

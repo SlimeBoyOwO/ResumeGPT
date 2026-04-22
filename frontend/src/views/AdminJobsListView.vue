@@ -1,18 +1,10 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '@/utils/api'
 import ExpertGraphEditor from '@/components/ExpertGraphEditor.vue'
 
 import * as echarts from 'echarts'
-
-interface ExpertOption {
-  id: number
-  name: string
-  description: string | null
-  system_prompt: string
-}
-
-
 
 interface JobItem {
   id: number
@@ -25,13 +17,11 @@ interface JobItem {
   workflow_graph: { nodes: any[]; edges: any[] } | null
 }
 
-const experts = ref<ExpertOption[]>([])
+const router = useRouter()
 const jobs = ref<JobItem[]>([])
 const total = ref(0)
 const loading = ref(false)
-const submitting = ref(false)
 const error = ref<string | null>(null)
-const success = ref<string | null>(null)
 
 const matchesDrawerOpen = ref(false)
 const currentJdTitle = ref('')
@@ -44,43 +34,8 @@ const expertEvaluations = ref<any[]>([])
 const loadingEvals = ref(false)
 let currentChartInstance: echarts.EChartsType | null = null
 
-const form = reactive({
-  title: '',
-  department: '',
-  description: '',
-  status: 'open' as 'open' | 'closed',
-  workflowMode: 'manual' as 'manual' | 'auto',
-  expectedHires: 10,
-  workflow_graph: { nodes: [], edges: [] } as { nodes: any[]; edges: any[] },
-})
-
-function resetForm() {
-  form.title = ''
-  form.department = ''
-  form.description = ''
-  form.status = 'open'
-  form.workflowMode = 'manual'
-  form.expectedHires = 10
-  form.workflow_graph = { nodes: [], edges: [] }
-}
-
-function validateForm(): string | null {
-  if (!form.title.trim()) return '请输入岗位名称。'
-  if (!form.description.trim()) return '请输入岗位描述。'
-
-  if (form.workflowMode === 'manual') {
-    if (!form.workflow_graph.nodes || form.workflow_graph.nodes.length === 0) {
-      return '手动模式下必须在画布中配置至少一个专家节点。'
-    }
-  }
-
-  return null
-}
-
-async function fetchExperts() {
-  const { data } = await api.get('/experts/')
-  experts.value = data
-}
+const graphDrawerOpen = ref(false)
+const currentGraphData = ref<{ nodes: any[]; edges: any[] } | null>(null)
 
 async function fetchJobs() {
   loading.value = true
@@ -88,41 +43,10 @@ async function fetchJobs() {
     const { data } = await api.get('/job-descriptions/', { params: { page: 1, page_size: 50 } })
     jobs.value = data.items
     total.value = data.total
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '获取 JD 列表失败。'
   } finally {
     loading.value = false
-  }
-}
-
-async function submitJob() {
-  error.value = null
-  success.value = null
-
-  const validationError = validateForm()
-  if (validationError) {
-    error.value = validationError
-    return
-  }
-
-  submitting.value = true
-  try {
-    const payload = {
-      title: form.title.trim(),
-      department: form.department.trim() || null,
-      description: form.description.trim(),
-      status: form.status,
-      expected_hires: form.expectedHires,
-      auto_select_experts: form.workflowMode === 'auto',
-      workflow_graph: form.workflowMode === 'manual' ? form.workflow_graph : null,
-    }
-
-    await api.post('/job-descriptions/', payload)
-    success.value = 'JD 已创建。'
-    resetForm()
-    await fetchJobs()
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || '创建 JD 失败，请重试。'
-  } finally {
-    submitting.value = false
   }
 }
 
@@ -138,6 +62,12 @@ async function viewMatches(job: JobItem) {
   } finally {
     loadingMatches.value = false
   }
+}
+
+function viewWorkflowGraph(job: JobItem) {
+  currentJdTitle.value = job.title
+  currentGraphData.value = job.workflow_graph || { nodes: [], edges: [] }
+  graphDrawerOpen.value = true
 }
 
 async function deleteJob(id: number) {
@@ -234,100 +164,40 @@ function formatDate(dateStr: string) {
   })
 }
 
-onMounted(async () => {
-  try {
-    await Promise.all([fetchExperts(), fetchJobs()])
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || '初始化数据失败。'
-  }
+onMounted(() => {
+  fetchJobs()
 })
 </script>
 
 <template>
   <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold text-surface-900">岗位管理</h1>
-      <p class="text-surface-500 mt-1">创建 JD 并配置专家工作流</p>
-    </div>
-
-    <div class="bg-white rounded-2xl p-6 shadow-sm space-y-4">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm text-surface-600 mb-1">岗位名称</label>
-          <input v-model="form.title" class="w-full px-3 py-2 rounded-lg border border-surface-200" type="text" />
-        </div>
-        <div>
-          <label class="block text-sm text-surface-600 mb-1">部门（可选）</label>
-          <input v-model="form.department" class="w-full px-3 py-2 rounded-lg border border-surface-200" type="text" />
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm text-surface-600 mb-1">岗位状态</label>
-          <select v-model="form.status" class="w-full px-3 py-2 rounded-lg border border-surface-200 bg-white">
-            <option value="open">open</option>
-            <option value="closed">closed</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm text-surface-600 mb-1">专家模式</label>
-          <select v-model="form.workflowMode" class="w-full px-3 py-2 rounded-lg border border-surface-200 bg-white">
-            <option value="manual">手动选择专家</option>
-            <option value="auto">自动选择（预留）</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="grid grid-cols-1 gap-4">
-        <div>
-          <label class="block text-sm text-surface-600 mb-1">查阅简历数量 (筛出TopN名)</label>
-          <input v-model.number="form.expectedHires" type="number" min="1" max="100" class="w-full px-3 py-2 rounded-lg border border-surface-200" />
-        </div>
-      </div>
-
+    <div class="flex items-center justify-between">
       <div>
-        <label class="block text-sm text-surface-600 mb-1">岗位描述</label>
-        <textarea v-model="form.description" rows="5" class="w-full px-3 py-2 rounded-lg border border-surface-200"></textarea>
+        <h1 class="text-2xl font-bold text-surface-900">JD 列表</h1>
+        <p class="text-surface-500 mt-1">查看和管理已发布的职位描述</p>
       </div>
-
-      <div class="mt-4">
-        <h3 class="text-sm font-semibold text-surface-800 mb-3">专家节点连线配置（手动模式）</h3>
-        <ExpertGraphEditor
-          v-model="form.workflow_graph"
-          :experts="experts"
-          :disabled="form.workflowMode === 'auto'"
-        />
-      </div>
-
-      <div v-if="error" class="p-3 rounded-lg bg-danger-50 text-danger-700 text-sm">
-        {{ error }}
-      </div>
-      <div v-if="success" class="p-3 rounded-lg bg-accent-50 text-accent-700 text-sm">
-        {{ success }}
-      </div>
-
-      <div class="flex justify-end">
-        <button
-          @click="submitJob"
-          :disabled="submitting"
-          class="px-5 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-40"
-        >
-          {{ submitting ? '提交中...' : '创建 JD' }}
-        </button>
-      </div>
+      <button
+        @click="router.push('/admin/jobs/create')"
+        class="px-4 py-2 rounded-xl bg-primary-600 text-white font-medium hover:bg-primary-700 transition"
+      >
+        ➕ 创建 JD
+      </button>
     </div>
 
     <div class="bg-white rounded-2xl p-6 shadow-sm">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold text-surface-900">JD 列表</h2>
+        <h2 class="text-lg font-semibold text-surface-900">所有岗位</h2>
         <span class="text-sm text-surface-500">共 {{ total }} 条</span>
+      </div>
+
+      <div v-if="error" class="p-3 mb-4 rounded-lg bg-danger-50 text-danger-700 text-sm">
+        {{ error }}
       </div>
 
       <div v-if="loading" class="py-10 text-center text-surface-400">加载中...</div>
       <div v-else-if="jobs.length === 0" class="py-10 text-center text-surface-400">暂无 JD</div>
       <div v-else class="space-y-3">
-        <div v-for="job in jobs" :key="job.id" class="border border-surface-100 rounded-xl p-4">
+        <div v-for="job in jobs" :key="job.id" class="border border-surface-100 rounded-xl p-4 hover:shadow-md transition">
           <div class="flex items-start justify-between gap-4">
             <div>
               <h3 class="text-base font-semibold text-surface-900">{{ job.title }}</h3>
@@ -341,9 +211,15 @@ onMounted(async () => {
               <p>节点总数：{{ job.workflow_graph?.nodes?.length || 0 }}</p>
               <button
                 @click="viewMatches(job)"
-                class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition font-medium"
+                class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition font-medium cursor-pointer"
               >
                 📊 查看初筛匹配
+              </button>
+              <button
+                @click="viewWorkflowGraph(job)"
+                class="mt-2 ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-50 text-surface-700 hover:bg-surface-100 transition font-medium cursor-pointer"
+              >
+                🔀 查看节点流
               </button>
               <button
                 @click="deleteJob(job.id)"
@@ -381,7 +257,7 @@ onMounted(async () => {
           </h3>
           <button
             @click="matchesDrawerOpen = false"
-            class="px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-sm text-surface-700 transition"
+            class="px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-sm text-surface-700 transition cursor-pointer"
           >
             关闭
           </button>
@@ -440,14 +316,14 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Evals Drawer -->
+    <!-- Evals Modal -->
     <div
       v-if="evaluationsDrawerOpen"
-      class="fixed inset-0 z-[60] bg-black/40 flex"
+      class="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
       @click.self="evaluationsDrawerOpen = false"
     >
-      <div class="ml-auto w-full max-w-xl h-full bg-surface-50 shadow-2xl flex flex-col p-6 overflow-hidden animate-slide-in-right">
-        <div class="flex items-center justify-between mb-4 border-b border-surface-200 pb-4 shrink-0">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div class="p-5 border-b border-surface-200 flex justify-between items-center bg-surface-50">
           <div>
             <h3 class="text-xl font-bold text-surface-900 flex items-center gap-2">
               <span>📑</span> 综合评价报告
@@ -456,13 +332,13 @@ onMounted(async () => {
           </div>
           <button
             @click="evaluationsDrawerOpen = false"
-            class="p-2 rounded-xl bg-surface-200 hover:bg-surface-300 text-surface-700 transition"
+            class="p-2 rounded-xl bg-surface-200 hover:bg-surface-300 text-surface-700 transition cursor-pointer"
           >
             ❌ 关闭
           </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto pr-2 space-y-6">
+        <div class="overflow-y-auto p-6 space-y-6" style="max-height: calc(90vh - 140px);">
           <div class="bg-white rounded-2xl p-4 shadow-sm border border-surface-100">
             <h4 class="font-bold text-surface-800 mb-3 text-sm flex items-center gap-1.5">
               <span class="w-1.5 h-4 bg-primary-500 rounded-full inline-block"></span>
@@ -478,19 +354,57 @@ onMounted(async () => {
             </h4>
             <div v-if="loadingEvals" class="py-10 text-center text-surface-400">加载评审数据中...</div>
             <div v-else-if="expertEvaluations.length === 0" class="text-xs text-center text-surface-400 py-6">暂无评价记录</div>
-            <div v-else class="space-y-3">
-              <div v-for="ev in expertEvaluations" :key="ev.id" class="p-4 bg-white border-l-4 border-l-blue-400 rounded-lg shadow-sm">
-                <div class="flex justify-between items-center mb-2">
-                  <span class="font-bold text-surface-800 text-[15px]">{{ ev.expert_name }}</span>
-                  <span class="text-lg font-black text-blue-600">{{ ev.score }}分</span>
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div v-for="ev in expertEvaluations" :key="ev.id" class="p-5 bg-white rounded-xl shadow-sm border border-surface-200 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-start mb-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm">
+                      {{ ev.expert_name.charAt(0) }}
+                    </div>
+                    <div>
+                      <span class="font-bold text-surface-800">{{ ev.expert_name }}</span>
+                      <div class="text-xs text-surface-400">专家评审</div>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-xl font-bold text-blue-600">{{ ev.score }}分</div>
+                  </div>
                 </div>
-                <div class="text-xs text-surface-500 bg-surface-50 p-2 rounded whitespace-pre-wrap leading-relaxed">
+                <div class="text-sm text-surface-600 bg-surface-50 p-3 rounded-lg whitespace-pre-wrap leading-relaxed">
                   {{ ev.analysis_content }}
                 </div>
-                <div class="text-[10px] text-surface-400 mt-2 text-right">评估于 {{ formatDate(ev.created_at) }}</div>
+                <div class="text-xs text-surface-400 mt-3 text-right">评估于 {{ formatDate(ev.created_at) }}</div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graph Drawer / Modal -->
+    <div
+      v-if="graphDrawerOpen"
+      class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      @click.self="graphDrawerOpen = false"
+    >
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div class="p-5 border-b border-surface-200 flex justify-between items-center bg-surface-50">
+          <h3 class="text-xl font-bold text-surface-900 flex items-center gap-2">
+            <span>🔀</span> 节点流视图 - {{ currentJdTitle }}
+          </h3>
+          <button
+            @click="graphDrawerOpen = false"
+            class="p-2 rounded-xl bg-surface-200 hover:bg-surface-300 text-surface-700 transition cursor-pointer"
+          >
+            ❌ 关闭
+          </button>
+        </div>
+        <div class="p-6 bg-surface-50">
+          <ExpertGraphEditor
+            v-model="currentGraphData"
+            disabled
+            readonly
+          />
         </div>
       </div>
     </div>

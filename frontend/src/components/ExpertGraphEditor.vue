@@ -12,11 +12,14 @@ interface ExpertOption {
   system_prompt: string
 }
 
-const props = defineProps<{
-  experts: ExpertOption[]
+const props = withDefaults(defineProps<{
+  experts?: ExpertOption[]
   modelValue: { nodes: any[]; edges: any[] } | null
   disabled?: boolean
-}>()
+  readonly?: boolean
+}>(), {
+  experts: () => []
+})
 
 const emit = defineEmits(['update:modelValue'])
 
@@ -36,7 +39,11 @@ watch(
   () => props.modelValue,
   (newVal) => {
     if (newVal) {
-      nodes.value = newVal.nodes || []
+      nodes.value = (newVal.nodes || []).map((n: any, i: number) => ({
+        ...n,
+        type: n.type || 'custom',
+        position: n.position || { x: (i % 3) * 300 + 50, y: Math.floor(i / 3) * 150 + 50 },
+      }))
       edges.value = newVal.edges || []
     } else {
       nodes.value = []
@@ -125,7 +132,7 @@ watch(edges, emitUpdate, { deep: true })
 <template>
   <div class="flex h-[500px] border border-surface-200 rounded-xl overflow-hidden bg-white" @keydown="removeFocusElements">
     <!-- Sidebar -->
-    <div class="w-64 bg-surface-50 border-r border-surface-200 p-4 flex flex-col gap-3 overflow-y-auto">
+    <div v-if="!readonly" class="w-64 bg-surface-50 border-r border-surface-200 p-4 flex flex-col gap-3 overflow-y-auto">
       <h3 class="text-sm font-semibold text-surface-700">专家库节点 (拖拽添加)</h3>
       <div
         v-for="expert in experts"
@@ -148,10 +155,10 @@ watch(edges, emitUpdate, { deep: true })
       <VueFlow
         v-model:nodes="nodes"
         v-model:edges="edges"
-        :class="{ 'opacity-80': disabled }"
-        :nodes-draggable="!disabled"
-        :nodes-connectable="!disabled"
-        :elements-selectable="!disabled"
+        :class="{ 'opacity-80': disabled && !readonly }"
+        :nodes-draggable="!(disabled || readonly)"
+        :nodes-connectable="!(disabled || readonly)"
+        :elements-selectable="true"
         :default-edge-options="defaultEdgeOptions"
         @nodeDoubleClick="onNodeDoubleClick"
         fit-view-on-init
@@ -169,6 +176,7 @@ watch(edges, emitUpdate, { deep: true })
             <div class="text-xs text-surface-600 flex items-center justify-between border-t border-surface-100 pt-2 mt-2">
               <span>节点权重</span>
               <input 
+                v-if="!readonly"
                 type="number" 
                 step="0.1" 
                 min="0"
@@ -177,6 +185,7 @@ watch(edges, emitUpdate, { deep: true })
                 @mousedown.stop 
                 class="w-16 border border-surface-200 rounded px-1.5 py-0.5 text-right nodrag focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
               />
+              <span v-else class="text-surface-900 font-medium">{{ nodeProps.data.weight }}</span>
             </div>
 
             <Handle type="source" :position="Position.Right" class="!w-3 !h-3 !bg-primary-500 -mr-1.5 border-2 border-white" />

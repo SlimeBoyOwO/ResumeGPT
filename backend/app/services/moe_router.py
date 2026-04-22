@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections import defaultdict, deque
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -108,6 +109,9 @@ async def auto_generate_workflow_graph(jd_id: int):
             res_text = response.choices[0].message.content or "{}"
             workflow_graph = json.loads(res_text)
 
+            # Post-process: add type and position for frontend VueFlow rendering
+            workflow_graph = _add_layout_to_graph(workflow_graph)
+
             # Update the JD with the new workflow graph
             jd.workflow_graph = workflow_graph
             session.add(jd)
@@ -120,3 +124,59 @@ async def auto_generate_workflow_graph(jd_id: int):
             
     except Exception as e:
         logger.error(f"Failed to auto-generate MoE workflow for JD {jd_id}: {e}", exc_info=True)
+
+
+def _add_layout_to_graph(graph: dict) -> dict:
+    """Add type='custom' and auto-layout positions to AI-generated nodes."""
+    nodes = graph.get("nodes", [])
+    edges = graph.get("edges", [])
+
+    node_ids = {n["id"] for n in nodes}
+    adj: dict[str, list[str]] = defaultdict(list)
+    in_deg: dict[str, int] = {nid: 0 for nid in node_ids}
+
+    for e in edges:
+        src, tgt = e.get("source"), e.get("target")
+        if src in node_ids and tgt in node_ids:
+            adj[src].append(tgt)
+            in_deg[tgt] += 1
+
+    # BFS topological layering
+    queue = deque()
+    layer_map: dict[str, int] = {}
+    for nid, deg in in_deg.items():
+        if deg == 0:
+            queue.append(nid)
+            layer_map[nid] = 0
+
+    while queue:
+        nid = queue.popleft()
+        for child in adj[nid]:
+            in_deg[child] -= 1
+            layer_map[child] = max(layer_map.get(child, 0), layer_map[nid] + 1)
+            if in_deg[child] == 0:
+                queue.append(child)
+
+    # Group by layer and assign positions
+    layers: dict[int, list[str]] = defaultdict(list)
+    for nid, layer in layer_map.items():
+        layers[layer].append(nid)
+
+    x_spacing, y_spacing = 300, 150
+    node_positions: dict[str, dict] = {}
+    for layer_idx in sorted(layers.keys()):
+        layer_nodes = layers[layer_idx]
+        total_height = (len(layer_nodes) - 1) * y_spacing
+        start_y = -total_height / 2
+        for i, nid in enumerate(layer_nodes):
+            node_positions[nid] = {
+                "x": layer_idx * x_spacing + 50,
+                "y": start_y + i * y_spacing + 50,
+            }
+
+    for n in nodes:
+        n["type"] = "custom"
+        if "position" not in n:
+            n["position"] = node_positions.get(n["id"], {"x": 50, "y": 50})
+
+    return graph

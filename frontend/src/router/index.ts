@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -59,10 +59,16 @@ const router = createRouter({
           meta: { title: '简历管理' },
         },
         {
-          path: 'jobs',
-          name: 'AdminJobs',
-          component: () => import('@/views/AdminJobsView.vue'),
-          meta: { title: '岗位管理' },
+          path: 'jobs/list',
+          name: 'AdminJobsList',
+          component: () => import('@/views/AdminJobsListView.vue'),
+          meta: { title: '岗位列表' },
+        },
+        {
+          path: 'jobs/create',
+          name: 'AdminJobCreate',
+          component: () => import('@/views/AdminJobCreateView.vue'),
+          meta: { title: '创建 JD' },
         },
       ],
     },

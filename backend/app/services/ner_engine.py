@@ -3,13 +3,6 @@
 
 from __future__ import annotations
 
-import os
-# 彻底禁用联网和自动转换
-os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
-os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
-os.environ["HF_HUB_OFFLINE"] = "1"
-
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,13 +13,6 @@ import pdfplumber
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, BertModel, BertPreTrainedModel
-
-# 彻底封堵 transformers 后台去 HuggingFace 请求讨论区的行为
-try:
-    import transformers.safetensors_conversion
-    transformers.safetensors_conversion.auto_conversion = lambda *args, **kwargs: None
-except (ImportError, AttributeError):
-    pass
 
 
 @dataclass(frozen=True)

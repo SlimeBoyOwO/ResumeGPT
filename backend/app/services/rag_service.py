@@ -45,22 +45,16 @@ except Exception as e:
     jd_col = None
 
 edu_level = {
-    "大专": 1, "本科": 2, "学士": 2, 
-    "硕士": 3, "研究生": 3, "博士": 4
+    "职高": 1, "高中": 1, "中专": 0, "大专": 2, "本科": 3, "学士": 4, 
+    "硕士": 4, "研究生": 4, "博士": 5
 }
 
 def parse_resume(resume_data: dict[str, Any]):
     name = resume_data.get("姓名") or "未知候选人"
     
-    resume_edu = "未知"
-    edu_val = 0
-    edu_list = resume_data.get("教育经历") or []
-    for edu in edu_list:
-        degree = (edu.get("学位") or "") + (edu.get("最高学历") or "")
-        for k, v in edu_level.items():
-            if k in degree and v > edu_val:
-                edu_val = v
-                resume_edu = degree
+    # 直接从resume_data获取最高学历
+    resume_edu = resume_data.get("最高学历") or "未知"
+    edu_val = edu_level.get(resume_edu, 0)
     
     semantic_text_parts = []
     work_list = resume_data.get("工作经历") or []
@@ -198,12 +192,12 @@ async def _match_resume_to_all_jds(session: AsyncSession, resume_id: int, resume
             if not jd_obj: continue
 
             hard_score = 0
-            required_edu_val = 2 # default to bachelor
-            
-            if resume_edu_val >= required_edu_val:
-                hard_score = 100
-            elif resume_edu_val > 0:
-                hard_score = 60
+
+            # hard_score根据学历等级分为5档：0分=0分, 1分=20分, 2分=40分, 3分=60分, 4分=80分, 5分=100分
+            hard_score = (resume_edu_val / 5) * 40 + 60
+
+            # 添加调试信息
+            print(f"[RAG匹配] Resume {resume_id} -> JD {jd_db_id}: RAG分数={semantic_score:.2f}, 教育hard_score={hard_score:.2f} (edu_level={resume_edu_val})")
 
             total = round(0.3 * hard_score + 0.7 * semantic_score, 2)
             await _upsert_match_record(session, jd_db_id, resume_id, total)
@@ -241,11 +235,12 @@ async def _match_jd_to_all_resumes(session: AsyncSession, jd: JobDescription, jd
             semantic_score = max(0, (1 - distances[i])) * 100
             
             hard_score = 0
-            required_edu_val = 2
-            if resume_edu_val >= required_edu_val:
-                hard_score = 100
-            elif resume_edu_val > 0:
-                hard_score = 60
+
+            # hard_score根据学历等级分为5档：0分=0分, 1分=20分, 2分=40分, 3分=60分, 4分=80分, 5分=100分
+            hard_score = (resume_edu_val / 5) * 40 + 60
+
+            # 添加调试信息
+            print(f"[RAG匹配] JD {jd.id} -> Resume {resume_db_id}: RAG分数={semantic_score:.2f}, 教育hard_score={hard_score:.2f} (edu_level={resume_edu_val})")
 
             total = round(0.3 * hard_score + 0.7 * semantic_score, 2)
             await _upsert_match_record(session, jd.id, resume_db_id, total)
