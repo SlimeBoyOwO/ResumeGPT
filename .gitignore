@@ -85,6 +85,7 @@ Pytorch/RAG/embedding_models/
 *.data
 # 发布产物
 release/
+pics/
 
 emotion_labels.csv
 

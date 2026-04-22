@@ -7,7 +7,9 @@
       "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/fonts.css\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/\")",
       "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/runtime.js\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/\")",
       "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/animations/animations.css\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/animations/\")",
-      "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/themes/engineering-whiteprint.css\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/themes/\")"
+      "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/themes/engineering-whiteprint.css\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/themes/\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('backend/app/services/expert_seed.py', encoding='utf-8'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(python -c ' *)"
     ]
   }
 }
