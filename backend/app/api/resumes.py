@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status, BackgroundTasks
+from fastapi.responses import FileResponse
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -184,6 +185,34 @@ async def get_resume(
     return ResumeResponse(
         **{k: v for k, v in resume.__dict__.items() if not k.startswith("_")},
         username=username,
+    )
+
+
+@router.get("/{resume_id}/file", response_class=FileResponse)
+async def get_resume_file(
+    resume_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取单个简历原文件"""
+    result = await db.execute(select(Resume).where(Resume.id == resume_id))
+    resume = result.scalar_one_or_none()
+
+    if not resume:
+        raise HTTPException(status_code=404, detail="简历不存在")
+
+    # 普通用户只能查看自己的简历
+    if current_user.role != "admin" and resume.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权限查看此简历")
+
+    file_path = Path(resume.file_path)
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在或已损坏")
+
+    return FileResponse(
+        path=file_path,
+        filename=resume.original_filename,
+        # 根据实际情况设置media_type，或者不设置让FastAPI自动判断
     )
 
 
