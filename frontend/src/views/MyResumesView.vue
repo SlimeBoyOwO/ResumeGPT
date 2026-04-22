@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/utils/api'
+import ResumeDataViewer from '@/components/ResumeDataViewer.vue'
 
 interface ResumeItem {
   id: number
@@ -162,35 +163,21 @@ onMounted(fetchResumes)
         <p class="text-surface-500 mt-1">管理和上传您的简历文件</p>
       </div>
       <div>
-        <button
-          @click="fetchMyMatches"
-          class="px-4 py-2 rounded-xl bg-accent-50 text-accent-700 hover:bg-accent-100 font-medium text-sm transition-colors flex items-center gap-2"
-        >
+        <button @click="fetchMyMatches"
+          class="px-4 py-2 rounded-xl bg-accent-50 text-accent-700 hover:bg-accent-100 font-medium text-sm transition-colors flex items-center gap-2">
           <span>🎯</span> 查看推荐岗位 (Top Matches)
         </button>
       </div>
     </div>
 
     <!-- 上传区域 -->
-    <div
-      class="border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 cursor-pointer"
-      :class="
-        dragOver
-          ? 'border-primary-400 bg-primary-50'
-          : 'border-surface-200 bg-white hover:border-primary-300 hover:bg-primary-50/50'
-      "
-      @click="fileInput?.click()"
-      @dragover.prevent="dragOver = true"
-      @dragleave="dragOver = false"
-      @drop.prevent="onDrop"
-    >
-      <input
-        ref="fileInput"
-        type="file"
-        class="hidden"
-        accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.bmp,.webp"
-        @change="onFileSelect"
-      />
+    <div class="border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-300 cursor-pointer" :class="dragOver
+        ? 'border-primary-400 bg-primary-50'
+        : 'border-surface-200 bg-white hover:border-primary-300 hover:bg-primary-50/50'
+      " @click="fileInput?.click()" @dragover.prevent="dragOver = true" @dragleave="dragOver = false"
+      @drop.prevent="onDrop">
+      <input ref="fileInput" type="file" class="hidden" accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.bmp,.webp"
+        @change="onFileSelect" />
 
       <div v-if="uploading" class="flex flex-col items-center gap-3">
         <svg class="animate-spin h-10 w-10 text-primary-500" viewBox="0 0 24 24">
@@ -216,16 +203,12 @@ onMounted(fetchResumes)
     </div>
 
     <!-- 上传反馈 -->
-    <div
-      v-if="uploadSuccess"
-      class="p-4 rounded-xl bg-accent-400/10 border border-accent-400/20 text-accent-600 text-sm flex items-center gap-2"
-    >
+    <div v-if="uploadSuccess"
+      class="p-4 rounded-xl bg-accent-400/10 border border-accent-400/20 text-accent-600 text-sm flex items-center gap-2">
       <span>✅</span> 简历上传成功！
     </div>
-    <div
-      v-if="uploadError"
-      class="p-4 rounded-xl bg-danger-500/10 border border-danger-500/20 text-danger-600 text-sm flex items-center gap-2"
-    >
+    <div v-if="uploadError"
+      class="p-4 rounded-xl bg-danger-500/10 border border-danger-500/20 text-danger-600 text-sm flex items-center gap-2">
       <span>⚠️</span> {{ uploadError }}
     </div>
 
@@ -258,12 +241,9 @@ onMounted(fetchResumes)
 
       <!-- 列表 -->
       <div v-else>
-        <div
-          v-for="(resume, index) in resumes"
-          :key="resume.id"
+        <div v-for="(resume, index) in resumes" :key="resume.id"
           class="flex items-center gap-4 px-6 py-4 border-b border-surface-50 hover:bg-surface-50/50 transition-colors"
-          :style="{ animationDelay: `${index * 50}ms` }"
-        >
+          :style="{ animationDelay: `${index * 50}ms` }">
           <div class="text-2xl">{{ fileTypeIcon(resume.file_type) }}</div>
           <div class="flex-1 min-w-0">
             <p class="font-medium text-surface-900 truncate">
@@ -273,25 +253,19 @@ onMounted(fetchResumes)
               {{ formatDate(resume.uploaded_at) }}
             </p>
           </div>
-          <span
-            class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
-            :class="statusLabel(resume.status).class"
-          >
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+            :class="statusLabel(resume.status).class">
             {{ statusLabel(resume.status).text }}
           </span>
           <div class="flex items-center gap-2 text-sm text-surface-400">
-            <button
-              @click.stop="openDrawer(resume)"
+            <button @click.stop="openDrawer(resume)"
               class="px-2.5 py-1 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 transition-colors cursor-pointer"
-              title="查看解析结果"
-            >
+              title="查看解析结果">
               查看解析
             </button>
-            <button
-              @click.stop="handleDelete(resume.id)"
+            <button @click.stop="handleDelete(resume.id)"
               class="p-2 rounded-lg hover:bg-danger-50 hover:text-danger-500 transition-colors cursor-pointer"
-              title="删除简历"
-            >
+              title="删除简历">
               🗑️
             </button>
           </div>
@@ -299,66 +273,61 @@ onMounted(fetchResumes)
 
         <!-- 分页 -->
         <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 py-4">
-          <button
-            :disabled="currentPage === 1"
-            @click="currentPage--; fetchResumes()"
-            class="px-3 py-1.5 rounded-lg text-sm disabled:opacity-40 hover:bg-surface-100 transition-colors cursor-pointer"
-          >
+          <button :disabled="currentPage === 1" @click="currentPage--; fetchResumes()"
+            class="px-3 py-1.5 rounded-lg text-sm disabled:opacity-40 hover:bg-surface-100 transition-colors cursor-pointer">
             上一页
           </button>
           <span class="text-sm text-surface-500">{{ currentPage }} / {{ totalPages }}</span>
-          <button
-            :disabled="currentPage === totalPages"
-            @click="currentPage++; fetchResumes()"
-            class="px-3 py-1.5 rounded-lg text-sm disabled:opacity-40 hover:bg-surface-100 transition-colors cursor-pointer"
-          >
+          <button :disabled="currentPage === totalPages" @click="currentPage++; fetchResumes()"
+            class="px-3 py-1.5 rounded-lg text-sm disabled:opacity-40 hover:bg-surface-100 transition-colors cursor-pointer">
             下一页
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 解析结果抽屉 -->
-    <div
-      v-if="drawerOpen"
-      class="fixed inset-0 z-50 bg-black/30"
-      @click.self="closeDrawer"
-    >
-      <div class="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl p-6 overflow-y-auto">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-surface-900">解析结果</h3>
-          <button
-            @click="closeDrawer"
-            class="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-200 text-sm text-surface-600"
-          >
-            关闭
-          </button>
+    <!-- 解析结果 Modal -->
+    <Teleport to="body">
+      <div v-if="drawerOpen"
+        class="fixed inset-0 z-[100] bg-black/40 overflow-y-auto p-4 sm:p-10 flex justify-center items-start"
+        @click.self="closeDrawer">
+        <div
+          class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden my-auto animate-fade-in">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-surface-100 shrink-0">
+            <div>
+              <h3 class="text-xl font-bold text-surface-900 flex items-center gap-2">
+                <span>📄</span> 简历内容解析卡片
+              </h3>
+              <div class="text-xs text-surface-500 mt-1 flex flex-wrap gap-4">
+                <span><span class="font-medium text-surface-700">源文件：</span>{{ drawerResume?.original_filename || '-'
+                  }}</span>
+                <span><span class="font-medium text-surface-700">向量ID：</span>{{ drawerResume?.vector_id || '未生成'
+                  }}</span>
+              </div>
+            </div>
+            <button @click="closeDrawer"
+              class="p-2 rounded-xl bg-surface-100 hover:bg-danger-50 hover:text-danger-500 text-surface-600 transition-colors cursor-pointer"
+              title="关闭">
+              ❌
+            </button>
+          </div>
+          <div class="p-4 overflow-y-auto bg-surface-50/50 flex-1">
+            <ResumeDataViewer :data="drawerResume?.ner_extracted_data || null" />
+          </div>
         </div>
-        <div class="text-sm text-surface-500 mb-3">
-          <span class="font-medium text-surface-700">向量ID：</span>
-          <span>{{ drawerResume?.vector_id || '-' }}</span>
-        </div>
-        <pre class="bg-surface-50 border border-surface-200 rounded-xl p-4 text-xs whitespace-pre-wrap">
-{{ formatJson(drawerResume?.ner_extracted_data || null) }}
-        </pre>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Top Matches 抽屉 -->
-    <div
-      v-if="matchesDrawerOpen"
-      class="fixed inset-0 z-50 bg-black/30"
-      @click.self="matchesDrawerOpen = false"
-    >
-      <div class="absolute right-0 top-0 h-full w-full max-w-lg bg-surface-50 shadow-xl p-6 overflow-y-auto flex flex-col">
+    <div v-if="matchesDrawerOpen" class="fixed inset-0 z-50 bg-black/30" @click.self="matchesDrawerOpen = false">
+      <div
+        class="absolute right-0 top-0 h-full w-full max-w-lg bg-surface-50 shadow-xl p-6 overflow-y-auto flex flex-col">
         <div class="flex items-center justify-between mb-6">
           <h3 class="text-lg font-bold text-surface-900 flex items-center gap-2">
             <span>🎯</span> 智能推荐岗位
           </h3>
-          <button
-            @click="matchesDrawerOpen = false"
-            class="px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-sm text-surface-700 transition"
-          >
+          <button @click="matchesDrawerOpen = false"
+            class="px-3 py-1.5 rounded-lg bg-surface-200 hover:bg-surface-300 text-sm text-surface-700 transition">
             关闭
           </button>
         </div>
@@ -370,21 +339,25 @@ onMounted(fetchResumes)
           </svg>
           <p class="text-surface-500 animate-pulse">正在向量库中检索匹配的岗位...</p>
         </div>
-        
-        <div v-else-if="matchesList.length === 0" class="py-12 flex flex-col justify-center items-center text-center opacity-70">
+
+        <div v-else-if="matchesList.length === 0"
+          class="py-12 flex flex-col justify-center items-center text-center opacity-70">
           <div class="text-5xl mb-4">📭</div>
           <p class="text-surface-700 font-medium">暂无匹配的岗位</p>
           <p class="text-sm text-surface-400 mt-1">请上传更完善的简历或等待HR发布新岗位</p>
         </div>
 
         <div v-else class="space-y-4 flex-1">
-          <div v-for="match in matchesList" :key="match.match_id" class="p-4 bg-white border border-surface-200 rounded-xl shadow-sm hover:border-primary-300 transition-colors">
+          <div v-for="match in matchesList" :key="match.match_id"
+            class="p-4 bg-white border border-surface-200 rounded-xl shadow-sm hover:border-primary-300 transition-colors">
             <div class="flex justify-between items-start mb-2">
               <h4 class="font-bold text-surface-900 text-base flex-1">{{ match.jd_title }}</h4>
-              <span class="text-2xl font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded-lg border border-primary-200">{{ match.final_score }}</span>
+              <span
+                class="text-2xl font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded-lg border border-primary-200">{{
+                  match.final_score }}</span>
             </div>
             <p class="text-xs text-surface-500 mb-3">{{ match.jd_department || '未提供部门' }}</p>
-            
+
             <div class="space-y-2">
               <div>
                 <div class="flex justify-between text-xs mb-1">

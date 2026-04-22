@@ -24,8 +24,20 @@ from app.schemas.job_description import (
 )
 from app.models.expert_evaluation import ExpertEvaluation
 from app.models.expert import Expert
+from app.services.moe_router import auto_generate_workflow_graph
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/job-descriptions", tags=["job-descriptions"])
+
+async def process_new_jd_workflow(jd_id: int, auto_select_experts: bool):
+    try:
+        if auto_select_experts:
+            await auto_generate_workflow_graph(jd_id)
+        await ingest_job_description(jd_id)
+    except Exception as e:
+        logger.error(f"Error in process_new_jd_workflow: {e}", exc_info=True)
 
 
 def _to_response(item: JobDescription) -> JobDescriptionResponse:
@@ -80,12 +92,14 @@ async def create_job_description(
     await db.commit()
     await db.refresh(jd)
     
-    bg_tasks.add_task(ingest_job_description, jd.id)
+    bg_tasks.add_task(process_new_jd_workflow, jd.id, body.auto_select_experts)
+        
     return _to_response(jd)
 
 @router.get("/{id}/matches")
 async def get_job_matches(
     id: int,
+    bg_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(require_admin),
 ):
@@ -93,6 +107,16 @@ async def get_job_matches(
     jd = jd_res.scalar_one_or_none()
     if not jd:
         raise HTTPException(status_code=404, detail="JD not found or no access.")
+        
+    # Self-healing logic
+    if jd.workflow_graph is None:
+        # Assuming if it's null it means auto_select_experts was used but hasn't finished
+        bg_tasks.add_task(auto_generate_workflow_graph, jd.id)
+    if not jd.vector_id:
+        bg_tasks.add_task(ingest_job_description, jd.id)
+        
+    from app.services.workflow_engine import auto_trigger_fine_screening
+    bg_tasks.add_task(auto_trigger_fine_screening, jd.id)
 
     # Get top expected_hires match records
     matches_res = await db.execute(
@@ -174,3 +198,23 @@ async def list_my_job_descriptions(
         total=total,
         items=[_to_response(item) for item in items],
     )
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_job_description(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+):
+    result = await db.execute(
+        select(JobDescription).where(
+            JobDescription.id == id,
+            JobDescription.enterprise_id == admin_user.id
+        )
+    )
+    jd = result.scalar_one_or_none()
+    if not jd:
+        raise HTTPException(status_code=404, detail="Job Description not found or no access.")
+        
+    await db.delete(jd)
+    await db.commit()
+    return None

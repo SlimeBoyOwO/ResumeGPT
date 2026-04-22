@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>基于大模型的智能简历审阅系统 · 毕设中期答辩</title>
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/animations/animations.css">
+<link rel="stylesheet" id="theme-link" href="assets/themes/engineering-whiteprint.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="tpl-defense" data-themes="engineering-whiteprint,blueprint,academic-paper" data-theme-base="assets/themes/">
+<div class="deck">
+
+  <!-- 1. Cover -->
+  <section class="slide" data-title="Cover">
+    <p class="kicker">Graduation Thesis Defense · 2026</p>
+    <div class="accent-line"></div>
+    <h1 class="h1 anim-fade-up" data-anim="fade-up">基于大模型的<br>智能简历审阅系统</h1>
+    <p class="cover-subtitle">AI-Powered Intelligent Resume Review System</p>
+    <div class="cover-meta">
+      <span>毕业设计 · 中期检查答辩</span>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="1" data-total="16"></span></div>
+  </section>
+
+  <!-- 2. TOC -->
+  <section class="slide" data-title="TOC">
+    <p class="kicker">Contents</p>
+    <h2 class="h2">目录</h2>
+    <div class="toc-grid anim-stagger-list" data-anim-target>
+      <div class="toc-card"><span class="num">01</span><h4>项目概述</h4><p>研究背景与系统简介</p></div>
+      <div class="toc-card"><span class="num">02</span><h4>技术架构</h4><p>技术栈与系统工作流</p></div>
+      <div class="toc-card"><span class="num">03</span><h4>NER 实体提取</h4><p>BERT + GlobalPointer 模型</p></div>
+      <div class="toc-card"><span class="num">04</span><h4>初筛机制</h4><p>RAG + 双阶段重排序</p></div>
+      <div class="toc-card"><span class="num">05</span><h4>精筛机制</h4><p>大模型 DAG 工作流</p></div>
+      <div class="toc-card"><span class="num">06</span><h4>MoE Agent</h4><p>Agent 路由与专家机制</p></div>
+      <div class="toc-card"><span class="num">07</span><h4>工作进度</h4><p>时间线与后续计划</p></div>
+      <div class="toc-card"><span class="num">08</span><h4>总结展望</h4><p>成果总结与未来方向</p></div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="2" data-total="16"></span></div>
+  </section>
+
+  <!-- 3. Project Overview -->
+  <section class="slide" data-title="Project Overview">
+    <p class="kicker">01 · Project Overview</p>
+    <h2 class="h2">研究背景与项目简介</h2>
+    <div class="two-col">
+      <div>
+        <h3 class="h3" style="font-size:20px;margin-top:16px">研究背景</h3>
+        <p class="lede" style="font-size:15px;margin-top:10px">传统简历筛选依赖人工审阅，面临效率低下、主观偏差和难以规模化等问题。随着大语言模型技术的发展，利用 AI 技术实现简历的自动化审阅、语义匹配和多维度评分成为可能。</p>
+        <h3 class="h3" style="font-size:20px;margin-top:24px">核心目标</h3>
+        <ul style="font-size:14px;line-height:2;color:var(--text-2);padding-left:20px;margin-top:8px">
+          <li>自动解析简历，提取结构化信息（NER）</li>
+          <li>基于语义的简历-JD 匹配（RAG 粗筛）</li>
+          <li>多专家 Agent 协同评分（精筛）</li>
+          <li>可解释的结构化评分报告</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="h3" style="font-size:20px;margin-top:16px">系统功能</h3>
+        <div style="display:grid;gap:10px;margin-top:10px">
+          <div class="db-item"><h4>简历解析</h4><p>PDF 上传 → NER 实体提取 → LLM 兜底提取</p></div>
+          <div class="db-item"><h4>PII 脱敏</h4><p>敏感信息自动替换，保护隐私安全</p></div>
+          <div class="db-item"><h4>语义匹配</h4><p>向量化存储 → RAG 粗筛 → 双阶段重排序</p></div>
+          <div class="db-item"><h4>专家评分</h4><p>DAG 工作流 → MoE Agent → 加权评分</p></div>
+          <div class="db-item"><h4>可视化</h4><p>雷达图 · 排行榜 · 节点流编辑器</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="3" data-total="16"></span></div>
+  </section>
+
+  <!-- 4. Tech Stack -->
+  <section class="slide" data-title="Tech Stack">
+    <p class="kicker">02 · Tech Stack</p>
+    <h2 class="h2">技术栈总览</h2>
+    <div class="stack-grid anim-stagger-list" data-anim-target>
+      <div class="stack-card"><h4>Frontend</h4><p>Vue 3 + TypeScript + Tailwind CSS + Pinia + Vite + VueFlow（DAG 图编辑器）+ ECharts（雷达图）</p></div>
+      <div class="stack-card"><h4>Backend</h4><p>Python + FastAPI（异步）+ SQLAlchemy（async with aiomysql）+ pdfplumber（PDF 解析）</p></div>
+      <div class="stack-card"><h4>Database</h4><p>MySQL（关系型存储）+ ChromaDB（向量数据库，持久化 cosine 距离）</p></div>
+      <div class="stack-card"><h4>NLP / NER</h4><p>chinese-roberta-wwm-ext + GlobalPointer 解码头（18 类命名实体识别）</p></div>
+      <div class="stack-card"><h4>LLM</h4><p>DeepSeek API（OpenAI 兼容接口）· CoT 思维链 · JSON 结构化输出</p></div>
+      <div class="stack-card"><h4>Embedding</h4><p>moka-ai/m3e-base（SentenceTransformer）· 768 维语义向量</p></div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="4" data-total="16"></span></div>
+  </section>
+
+  <!-- 5. System Workflow -->
+  <section class="slide" data-title="System Workflow">
+    <p class="kicker">02 · System Workflow</p>
+    <h2 class="h2">系统整体工作流</h2>
+    <div class="pipeline anim-stagger-list" data-anim-target>
+      <div class="pipe-node"><h4>PDF 上传</h4><p>文本解析</p></div>
+      <div class="pipe-arr">&rarr;</div>
+      <div class="pipe-node hl"><h4>BERT NER</h4><p>18 类实体提取</p></div>
+      <div class="pipe-arr">&rarr;</div>
+      <div class="pipe-node"><h4>PII 脱敏</h4><p>隐私保护</p></div>
+      <div class="pipe-arr">&rarr;</div>
+      <div class="pipe-node"><h4>LLM 提取</h4><p>兜底补充</p></div>
+      <div class="pipe-arr">&rarr;</div>
+      <div class="pipe-node"><h4>向量化</h4><p>m3e-base</p></div>
+    </div>
+    <div class="pipeline" style="margin-top:8px;justify-content:center">
+      <div style="color:var(--text-3);font-size:28px">&darr;</div>
+    </div>
+    <div class="pipeline">
+      <div class="pipe-node"><h4>ChromaDB</h4><p>向量存储</p></div>
+      <div class="pipe-arr">&rarr;</div>
+      <div class="pipe-node hl"><h4>RAG 粗筛</h4><p>语义 + 硬性规则</p></div>
+      <div class="pipe-arr">&rarr;</div>
+      <div class="pipe-node"><h4>MoE Router</h4><p>Agent 选专家</p></div>
+      <div class="pipe-arr">&rarr;</div>
+      <div class="pipe-node hl"><h4>DAG 精筛</h4><p>专家节点流</p></div>
+      <div class="pipe-arr">&rarr;</div>
+      <div class="pipe-node"><h4>加权评分</h4><p>雷达图生成</p></div>
+    </div>
+    <p class="lede" style="margin-top:24px;font-size:14px">粗筛阶段使用 RAG 语义匹配 + 双阶段重排序（语义得分 70% + 硬性规则 30%），≥85 分的简历自动进入 DAG 专家工作流精筛</p>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="5" data-total="16"></span></div>
+  </section>
+
+  <!-- 6. Database Design -->
+  <section class="slide" data-title="Database Design">
+    <p class="kicker">02 · Database Design</p>
+    <h2 class="h2">数据库设计 · 7 张核心表</h2>
+    <div class="db-grid anim-stagger-list" data-anim-target>
+      <div class="db-item"><h4>users</h4><p>用户表 — 角色区分（admin / user），JWT 认证，bcrypt 密码哈希</p><span class="tag">id · username · email · hashed_password · role</span></div>
+      <div class="db-item"><h4>resumes</h4><p>简历表 — 存储 NER 提取的 JSON 结构化数据，关联 ChromaDB 向量 ID</p><span class="tag">ner_extracted_data · vector_id · status</span></div>
+      <div class="db-item"><h4>job_descriptions</h4><p>JD 表 — 存储工作流 DAG 图 JSON，期望录取人数，向量 ID</p><span class="tag">workflow_graph · expected_hires · vector_id</span></div>
+      <div class="db-item"><h4>experts</h4><p>专家配置表 — 专家名称、描述与 system_prompt</p><span class="tag">name · description · system_prompt</span></div>
+      <div class="db-item"><h4>match_records</h4><p>匹配记录表 — 状态机驱动的全生命周期管理</p><span class="tag">rough_matching &rarr; agent_evaluating &rarr; completed</span></div>
+      <div class="db-item"><h4>expert_evaluations</h4><p>专家评分记录 — 每个专家节点的独立评分与分析内容</p><span class="tag">node_id · score · analysis_content</span></div>
+      <div class="db-item" style="grid-column:span 2"><h4>jd_expert_configs</h4><p>JD-专家多对多配置表 — 复合主键（jd_id, expert_id），存储每个专家在该 JD 中的权重</p><span class="tag">jd_id · expert_id · weight</span></div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="6" data-total="16"></span></div>
+  </section>
+
+  <!-- 7. NER Architecture -->
+  <section class="slide" data-title="NER Architecture">
+    <p class="kicker">03 · NER Model Architecture</p>
+    <h2 class="h2">NER 实体提取 · 模型架构</h2>
+    <div class="arch-box">
+      <div class="arch-card">
+        <h4>Encoder: chinese-roberta-wwm-ext</h4>
+        <ul>
+          <li>基于 RoBERTa 的中文预训练模型</li>
+          <li>全词遮蔽（Whole Word Masking）策略</li>
+          <li>输出 768 维隐藏状态向量</li>
+          <li>最大序列长度 512 tokens</li>
+          <li>通过微调适配简历 NER 任务</li>
+        </ul>
+      </div>
+      <div class="arch-card">
+        <h4>Decoder: GlobalPointer</h4>
+        <ul>
+          <li>替代传统 CRF，直接预测实体 span</li>
+          <li>4D logits: <span class="mono" style="font-size:13px">[batch, 18, seq, seq]</span></li>
+          <li>位置 (i,j) = token i..j 构成实体的得分</li>
+          <li>旋转位置编码（RoPE）注入位置信息</li>
+          <li>上三角掩码确保 start &le; end</li>
+          <li>缩放因子 1/&radic;(head_size=64)</li>
+        </ul>
+      </div>
+    </div>
+    <p class="kicker" style="margin-top:20px;letter-spacing:.06em;font-size:12px">18 ENTITY CLASSES</p>
+    <div class="entity-tags">
+      <span class="etag">姓名</span><span class="etag">性别</span><span class="etag">出生日期</span>
+      <span class="etag">电话</span><span class="etag">最高学历</span><span class="etag">籍贯</span>
+      <span class="etag">现居城市</span><span class="etag">政治面貌</span><span class="etag">大学</span>
+      <span class="etag">雇主</span><span class="etag">职位</span><span class="etag">工作内容</span>
+      <span class="etag">项目名称</span><span class="etag">项目职责</span><span class="etag">学位</span>
+      <span class="etag">毕业时间</span><span class="etag">工作时间段</span><span class="etag">项目时间段</span>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="7" data-total="16"></span></div>
+  </section>
+
+  <!-- 8. NER Training -->
+  <section class="slide" data-title="NER Training">
+    <p class="kicker">03 · NER Training &amp; Results</p>
+    <h2 class="h2">训练过程与实验结果</h2>
+    <div class="train-grid">
+      <div class="train-card">
+        <h4>数据与预处理</h4>
+        <ul>
+          <li>2000 份合成简历 PDF + JSON 标注</li>
+          <li>pdfplumber 解析 PDF 文本</li>
+          <li>RoBERTa 分词器编码（max_length=512）</li>
+          <li>字符级 span &rarr; token 偏移量对齐</li>
+          <li>标签矩阵：[18, seq_len, seq_len]</li>
+          <li>训练集 : 验证集 = 9 : 1</li>
+        </ul>
+      </div>
+      <div class="train-card">
+        <h4>训练策略</h4>
+        <ul>
+          <li>AdamW 优化器 · lr = 2e-5</li>
+          <li>线性预热（10% 步数）+ 衰减</li>
+          <li>batch_size = 16 · 15 epochs</li>
+          <li>混合精度训练（AMP + GradScaler）</li>
+          <li>梯度裁剪 max_norm = 1.0</li>
+          <li>Early stopping patience = 3</li>
+        </ul>
+      </div>
+      <div class="train-card">
+        <h4>FGM 对抗训练</h4>
+        <ul>
+          <li>Fast Gradient Method 嵌入扰动</li>
+          <li>正常前向 + 反向后执行攻击</li>
+          <li>扰动词嵌入 &rarr; 二次前向+反向</li>
+          <li>恢复原始嵌入 &rarr; 更新参数</li>
+          <li>提升模型对输入噪声的鲁棒性</li>
+        </ul>
+      </div>
+      <div class="train-card">
+        <h4>推理引擎</h4>
+        <ul>
+          <li>滑动窗口：chunk=450, overlap=50</li>
+          <li>重叠区域实体去重（category, start, end）</li>
+          <li>嵌套 JSON 重建：按位置分组</li>
+          <li>相同 schema 块连续实体自动归组</li>
+          <li>离线加载，HF Hub 完全禁用</li>
+        </ul>
+      </div>
+    </div>
+    <div class="kpi-row" style="margin-top:20px">
+      <div class="kpi"><div class="big">0.9953</div><div class="label">Entity F1 Score</div></div>
+      <div class="kpi"><div class="big">0.9962</div><div class="label">Precision</div></div>
+      <div class="kpi"><div class="big">0.9943</div><div class="label">Recall</div></div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="8" data-total="16"></span></div>
+  </section>
+
+  <!-- 9. PII Privacy -->
+  <section class="slide" data-title="PII Privacy">
+    <p class="kicker">03 · PII Masking Pipeline</p>
+    <h2 class="h2">PII 脱敏保护机制</h2>
+    <p class="lede" style="font-size:16px;margin-top:8px">在调用大语言模型前，自动替换敏感信息；LLM 返回后自动还原真实数据，实现隐私保护</p>
+    <div class="pii-flow anim-stagger-list" data-anim-target>
+      <div class="pii-step"><div class="step-num">01</div><h4>NER 提取</h4><p>BERT NER 优先提取<br>姓名和电话号码</p></div>
+      <div class="pii-step"><div class="step-num">02</div><h4>PII 替换</h4><p>姓名 &rarr; "张三"<br>电话 &rarr; "10086114514"</p></div>
+      <div class="pii-step"><div class="step-num">03</div><h4>LLM 提取</h4><p>脱敏文本 + 脱敏 NER hint<br>发送给 DeepSeek LLM</p></div>
+      <div class="pii-step"><div class="step-num">04</div><h4>PII 还原</h4><p>LLM 输出中的占位符<br>替换回真实值</p></div>
+    </div>
+    <div class="two-col" style="margin-top:24px">
+      <div class="arch-card">
+        <h4>设计要点</h4>
+        <ul>
+          <li>LLM 全程无法接触真实 PII 数据</li>
+          <li>NER 本地推理，敏感信息不出服务器</li>
+          <li>占位符选择避免与真实数据冲突</li>
+          <li>文本和 NER hint 双重脱敏</li>
+        </ul>
+      </div>
+      <div class="arch-card">
+        <h4>应用场景</h4>
+        <ul>
+          <li>简历上传时的 LLM 兜底提取</li>
+          <li>专家评判前的简历数据处理</li>
+          <li>保障 GDPR/个人信息保护合规</li>
+          <li>防止 LLM 训练数据泄露风险</li>
+        </ul>
+      </div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="9" data-total="16"></span></div>
+  </section>
+
+  <!-- 10. RAG Coarse Screening -->
+  <section class="slide" data-title="RAG Coarse Screening">
+    <p class="kicker">04 · RAG + Two-Stage Reranking</p>
+    <h2 class="h2">初筛 · RAG + 双阶段重排序</h2>
+    <div class="two-col">
+      <div>
+        <div class="arch-card" style="margin-top:0">
+          <h4>向量化入库流程</h4>
+          <ul>
+            <li>从 NER JSON 提取候选人关键信息</li>
+            <li>学历等级映射：专科=1 / 本科=2 / 硕士=3 / 博士=4</li>
+            <li>拼接工作经历（职位+内容）和项目经历（项目名+职责）为语义文本</li>
+            <li>m3e-base 编码为 768 维向量</li>
+            <li>Upsert 到 ChromaDB（cosine 距离）</li>
+            <li>两个 Collection：resume_collection / jd_collection</li>
+          </ul>
+        </div>
+        <div class="arch-card" style="margin-top:12px">
+          <h4>自动匹配触发</h4>
+          <ul>
+            <li>简历入库 &rarr; 匹配所有已有 JD</li>
+            <li>JD 入库 &rarr; 匹配所有已有简历</li>
+            <li>&ge;85 分自动触发精筛流程</li>
+          </ul>
+        </div>
+      </div>
+      <div>
+        <div class="formula-box">
+          <div style="margin-bottom:8px;font-weight:700;color:var(--accent-2);font-size:14px">SCORING FORMULA</div>
+          <div>semantic = max(0, (1 - cos_dist)) &times; 100</div>
+          <div style="margin-top:6px">hard_score:</div>
+          <div style="padding-left:16px;font-size:13px;color:var(--text-2)">
+            &bull; &ge; 本科 &rarr; 100<br>
+            &bull; 有学历 &rarr; 60<br>
+            &bull; 无学历 &rarr; 0
+          </div>
+          <div style="margin-top:12px;font-size:18px;font-weight:700;color:var(--text-1)">
+            total = 0.3 &times; hard + 0.7 &times; semantic
+          </div>
+        </div>
+        <div class="arch-card" style="margin-top:12px">
+          <h4>双阶段重排序原理</h4>
+          <ul>
+            <li><b>第一阶段</b>：语义相似度召回（70% 权重）—— 通过 m3e-base 编码后的余弦距离计算语义匹配度</li>
+            <li><b>第二阶段</b>：硬性规则过滤（30% 权重）—— 学历等级等硬性指标进行重排序</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="10" data-total="16"></span></div>
+  </section>
+
+  <!-- 11. DAG Workflow -->
+  <section class="slide" data-title="DAG Workflow">
+    <p class="kicker">05 · DAG Workflow Engine</p>
+    <h2 class="h2">精筛 · 大模型 DAG 工作流</h2>
+    <div class="two-col">
+      <div>
+        <div class="arch-card" style="margin-top:0">
+          <h4>DAG 拓扑排序执行引擎</h4>
+          <ul>
+            <li>Kahn 算法 BFS 确定执行顺序</li>
+            <li>入度为 0 的节点可并行执行</li>
+            <li>使用 <span class="mono" style="font-size:13px">asyncio.gather</span> 并发调度</li>
+            <li>每完成一个节点，下游节点入度 -1</li>
+            <li>入度归零 &rarr; 入队执行</li>
+          </ul>
+        </div>
+        <div class="arch-card" style="margin-top:12px">
+          <h4>单专家节点执行流程</h4>
+          <ul>
+            <li>读取专家 system_prompt</li>
+            <li>注入简历 NER 数据 + JD 描述</li>
+            <li>拼接前置节点评价（ToT 思维树）</li>
+            <li>DeepSeek LLM 输出 JSON</li>
+            <li>结果：<span class="mono" style="font-size:13px">{score, evaluation}</span></li>
+          </ul>
+        </div>
+      </div>
+      <div>
+        <div class="dag-flow">
+          <div class="dag-layer">
+            <div class="dag-node expert"><h4>技术能力专家</h4><p>weight: 0.3</p></div>
+            <div class="dag-node expert"><h4>项目经验专家</h4><p>weight: 0.25</p></div>
+            <div class="dag-node expert"><h4>业务匹配专家</h4><p>weight: 0.25</p></div>
+          </div>
+          <div class="dag-arr">&darr;&ensp;&darr;&ensp;&darr;</div>
+          <div class="dag-layer">
+            <div class="dag-node agg"><h4>HR 综合专家</h4><p>weight: 0.2 · 结合上游评价</p></div>
+          </div>
+          <div class="dag-arr">&darr;</div>
+          <div class="dag-layer">
+            <div class="dag-node" style="border-left:3px solid var(--good)"><h4>加权汇总 &rarr; final_score</h4><p>&Sigma;(score<sub>i</sub> &times; w<sub>i</sub>) / &Sigma;(w<sub>i</sub>)</p></div>
+          </div>
+          <div class="dag-arr">&darr;</div>
+          <div class="dag-layer">
+            <div class="dag-node" style="border-left:3px solid var(--accent-3)"><h4>雷达图生成</h4><p>6 维能力评估</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="11" data-total="16"></span></div>
+  </section>
+
+  <!-- 12. Radar Chart -->
+  <section class="slide" data-title="Radar Chart">
+    <p class="kicker">05 · Ability Radar Chart</p>
+    <h2 class="h2">六维能力雷达图</h2>
+    <div class="two-col">
+      <div>
+        <p class="lede" style="font-size:15px;margin-top:12px">所有专家评分完成后，系统额外调用 LLM 生成 6 维综合能力雷达图，存储在 match_records.ability_summary 字段中。</p>
+        <div style="display:grid;gap:10px;margin-top:16px">
+          <div class="db-item"><h4>专业技能</h4><p>技术深度、工具链掌握、编程能力</p></div>
+          <div class="db-item"><h4>商业经验</h4><p>行业背景、业务理解、客户导向</p></div>
+          <div class="db-item"><h4>学习潜力</h4><p>成长速度、知识广度、跨领域能力</p></div>
+          <div class="db-item"><h4>沟通协作</h4><p>团队合作、表达能力、领导力</p></div>
+          <div class="db-item"><h4>抗压稳定</h4><p>工作稳定性、职业忠诚度、心理韧性</p></div>
+          <div class="db-item"><h4>岗位匹配</h4><p>JD 需求吻合度、综合适配评估</p></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center">
+        <svg viewBox="0 0 400 380" style="width:100%;max-width:360px">
+          <defs>
+            <style>
+              .radar-line{fill:none;stroke:var(--border-strong,#0a1e46);stroke-width:.5;opacity:.3}
+              .radar-axis{stroke:var(--border-strong,#0a1e46);stroke-width:.5;opacity:.3}
+              .radar-fill{fill:var(--accent-2,#1e5ac4);opacity:.18;stroke:var(--accent-2,#1e5ac4);stroke-width:2}
+              .radar-dot{fill:var(--accent-2,#1e5ac4);r:4}
+              .radar-label{font-size:13px;fill:var(--text-1,#0a1e46);font-weight:600;text-anchor:middle;font-family:var(--font-sans)}
+            </style>
+          </defs>
+          <g transform="translate(200,195)">
+            <polygon class="radar-line" points="0,-150 129.9,75 -129.9,75"/>
+            <polygon class="radar-line" points="0,-120 103.9,60 -103.9,60"/>
+            <polygon class="radar-line" points="0,-90 77.9,45 -77.9,45"/>
+            <polygon class="radar-line" points="0,-60 52,30 -52,30"/>
+            <polygon class="radar-line" points="0,-30 26,15 -26,15"/>
+            <polygon class="radar-line" points="0,-150 129.9,-75 129.9,75 0,150 -129.9,75 -129.9,-75"/>
+            <polygon class="radar-line" points="0,-120 103.9,-60 103.9,60 0,120 -103.9,60 -103.9,-60"/>
+            <polygon class="radar-line" points="0,-90 77.9,-45 77.9,45 0,90 -77.9,45 -77.9,-45"/>
+            <line class="radar-axis" x1="0" y1="0" x2="0" y2="-150"/>
+            <line class="radar-axis" x1="0" y1="0" x2="129.9" y2="-75"/>
+            <line class="radar-axis" x1="0" y1="0" x2="129.9" y2="75"/>
+            <line class="radar-axis" x1="0" y1="0" x2="0" y2="150"/>
+            <line class="radar-axis" x1="0" y1="0" x2="-129.9" y2="75"/>
+            <line class="radar-axis" x1="0" y1="0" x2="-129.9" y2="-75"/>
+            <polygon class="radar-fill" points="0,-128 113,-52 104,60 0,105 -78,45 -91,-52"/>
+            <circle class="radar-dot" cx="0" cy="-128"/>
+            <circle class="radar-dot" cx="113" cy="-52"/>
+            <circle class="radar-dot" cx="104" cy="60"/>
+            <circle class="radar-dot" cx="0" cy="105"/>
+            <circle class="radar-dot" cx="-78" cy="45"/>
+            <circle class="radar-dot" cx="-91" cy="-52"/>
+            <text class="radar-label" x="0" y="-162">专业技能</text>
+            <text class="radar-label" x="158" y="-72">商业经验</text>
+            <text class="radar-label" x="158" y="88">学习潜力</text>
+            <text class="radar-label" x="0" y="175">沟通协作</text>
+            <text class="radar-label" x="-158" y="88">抗压稳定</text>
+            <text class="radar-label" x="-158" y="-72">岗位匹配</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="12" data-total="16"></span></div>
+  </section>
+
+  <!-- 13. MoE Agent -->
+  <section class="slide" data-title="MoE Agent">
+    <p class="kicker">06 · MoE Agent Mechanism</p>
+    <h2 class="h2">MoE Agent 路由机制</h2>
+    <p class="lede" style="font-size:15px">LLM 充当 Router Agent，自动分析 JD 内容，选择激活的专家并构建 DAG 工作流</p>
+    <div class="expert-grid anim-stagger-list" data-anim-target>
+      <div class="expert-card"><div class="icon" style="color:var(--accent-2)">&lt;/&gt;</div><h4>技术能力专家</h4><p>技术深度 · 技术栈匹配 · 工程能力</p></div>
+      <div class="expert-card"><div class="icon" style="color:var(--accent-2)">&oplus;</div><h4>项目经验专家</h4><p>项目复杂度 · 贡献度 · 成果</p></div>
+      <div class="expert-card"><div class="icon" style="color:var(--accent-2)">&there4;</div><h4>业务匹配专家</h4><p>行业背景 · JD 需求匹配</p></div>
+      <div class="expert-card"><div class="icon" style="color:var(--accent-2)">&equiv;</div><h4>HR 综合专家</h4><p>沟通协作 · 稳定性 · 风险</p></div>
+    </div>
+    <div class="router-steps" style="margin-top:20px">
+      <div class="rstep"><div class="num">01</div><h4>加载上下文</h4><p>读取 JD 描述 + 所有可用专家（名称、ID、描述、system_prompt）</p></div>
+      <div class="rstep"><div class="num">02</div><h4>LLM 路由决策</h4><p>DeepSeek（temperature=0.2, JSON 模式）自动选择 2-5 个专家，分配权重（&Sigma;=1.0），定义依赖边</p></div>
+      <div class="rstep"><div class="num">03</div><h4>DAG 生成</h4><p>返回 {nodes[], edges[]} JSON，存入 jd.workflow_graph，拓扑排序后执行</p></div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:16px">
+      <div class="pill pill-hl">自动模式：LLM Agent 路由选择</div>
+      <div class="pill">手动模式：VueFlow 图编辑器拖拽</div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="13" data-total="16"></span></div>
+  </section>
+
+  <!-- 14. Timeline -->
+  <section class="slide" data-title="Timeline">
+    <p class="kicker">07 · Work Progress</p>
+    <h2 class="h2">工作进度</h2>
+    <div class="tl">
+      <div class="row anim-stagger-list" data-anim-target>
+        <div class="item"><div class="date">3/4</div><div class="dot"></div><h4>前后端基础</h4><p>用户认证 · MySQL 数据库 · 简历上传</p></div>
+        <div class="item"><div class="date">3/6</div><div class="dot"></div><h4>NER 模型</h4><p>BERT 训练完成<br>F1: 0.9953</p></div>
+        <div class="item"><div class="date">3/9</div><div class="dot"></div><h4>数据库设计</h4><p>7 张表 ER 图<br>SQL 语句编写</p></div>
+        <div class="item"><div class="date">3/10</div><div class="dot"></div><h4>向量化 + RAG</h4><p>ChromaDB 集成<br>粗筛功能 + LLM 提取</p></div>
+      </div>
+    </div>
+    <div class="tl" style="margin-top:48px">
+      <div class="row anim-stagger-list" data-anim-target>
+        <div class="item"><div class="date">3/16</div><div class="dot"></div><h4>PII + LLM</h4><p>脱敏处理<br>LLM 兜底提取</p></div>
+        <div class="item"><div class="date">3/18</div><div class="dot"></div><h4>JD + 工作流</h4><p>JD 上传<br>节点流编辑器</p></div>
+        <div class="item"><div class="date">3/19</div><div class="dot"></div><h4>核心完成</h4><p>自动粗筛 + 细筛<br>专家评分流程</p></div>
+        <div class="item"><div class="date">4/21</div><div class="dot"></div><h4>MoE Agent</h4><p>Agent 自动选专家<br>PII 集成 · 前端美化</p></div>
+      </div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="14" data-total="16"></span></div>
+  </section>
+
+  <!-- 15. Summary -->
+  <section class="slide" data-title="Summary">
+    <p class="kicker">08 · Summary &amp; Outlook</p>
+    <h2 class="h2">总结与展望</h2>
+    <div class="two-col">
+      <div>
+        <h3 class="h3" style="font-size:20px;margin-top:12px">已完成的核心功能</h3>
+        <div class="sum-grid" style="grid-template-columns:1fr;margin-top:12px">
+          <div class="sum-card"><h4>BERT NER 高精度实体提取</h4><p>F1=0.9953，18 类实体，滑动窗口处理长文档</p></div>
+          <div class="sum-card"><h4>RAG 双阶段重排序</h4><p>语义 70% + 硬性 30%，ChromaDB 向量检索</p></div>
+          <div class="sum-card"><h4>DAG 拓扑排序工作流</h4><p>Kahn 算法 + asyncio 并发，ToT 思维树</p></div>
+          <div class="sum-card"><h4>MoE Agent 自动路由</h4><p>LLM Router 自动选专家，生成 DAG 图</p></div>
+          <div class="sum-card"><h4>PII 隐私保护</h4><p>NER 提取 &rarr; 脱敏 &rarr; LLM &rarr; 还原</p></div>
+        </div>
+      </div>
+      <div>
+        <h3 class="h3" style="font-size:20px;margin-top:12px">系统亮点</h3>
+        <div style="margin-top:12px;display:grid;gap:8px">
+          <div class="pill" style="display:block;padding:10px 14px">全异步架构 — FastAPI + async SQLAlchemy + asyncio.gather</div>
+          <div class="pill" style="display:block;padding:10px 14px">NLP + LLM 双引擎 — BERT 高精度 + LLM 高理解力互补</div>
+          <div class="pill" style="display:block;padding:10px 14px">可视化节点编辑器 — VueFlow 拖拽式 DAG 工作流设计</div>
+          <div class="pill" style="display:block;padding:10px 14px">6 维雷达图 — 多维度量化评价，结果可解释</div>
+        </div>
+        <h3 class="h3" style="font-size:20px;margin-top:24px">后续工作</h3>
+        <ul class="outlook-list">
+          <li>支持更多简历格式（Word、图片 OCR）</li>
+          <li>面试通知与应聘状态系统</li>
+          <li>更丰富的数据分析与可视化</li>
+          <li>模型效果评估与 A/B 测试</li>
+        </ul>
+      </div>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="15" data-total="16"></span></div>
+  </section>
+
+  <!-- 16. Thanks -->
+  <section class="slide center" data-title="Thanks">
+    <div>
+      <div style="font-size:100px;font-weight:800;color:var(--accent-2,#1e5ac4);font-family:var(--font-mono);letter-spacing:-.04em;opacity:.85">Q&A</div>
+      <h2 class="h2" style="margin-top:12px">感谢各位老师指导</h2>
+      <p class="lede" style="margin:16px auto 0;max-width:500px">基于大模型的智能简历审阅系统<br>毕业设计 · 中期检查答辩</p>
+      <div class="accent-line" style="margin:24px auto"></div>
+      <p style="font-size:14px;color:var(--text-3)">请各位老师批评指正</p>
+    </div>
+    <div class="deck-footer"><span>基于大模型的智能简历审阅系统</span><span class="slide-number" data-current="16" data-total="16"></span></div>
+  </section>
+
+</div>
+<script src="assets/runtime.js"></script>
+</body></html>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx skills *)",
+      "Bash(npx html-ppt-skill *)",
+      "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/base.css\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/\")",
+      "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/fonts.css\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/\")",
+      "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/runtime.js\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/\")",
+      "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/animations/animations.css\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/animations/\")",
+      "Bash(cp \"C:/Users/NoiQ/.claude/skills/html-ppt/assets/themes/engineering-whiteprint.css\" \"D:/NoiProjects/GitHub/ResumeGPT/docs/html-ppt/assets/themes/\")"
+    ]
+  }
+}

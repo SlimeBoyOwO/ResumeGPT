@@ -206,7 +206,7 @@ async def _match_resume_to_all_jds(session: AsyncSession, resume_id: int, resume
                 hard_score = 60
 
             total = round(0.3 * hard_score + 0.7 * semantic_score, 2)
-            await _upsert_match_record(session, jd_db_id, resume_id, semantic_score, total)
+            await _upsert_match_record(session, jd_db_id, resume_id, total)
             
         logger.info(f"Successfully matched Resume {resume_id} to {len(ids)} JDs.")
     except Exception as e:
@@ -231,6 +231,11 @@ async def _match_jd_to_all_resumes(session: AsyncSession, jd: JobDescription, jd
 
         for i in range(len(ids)):
             resume_db_id = metadatas[i]["id"]
+            
+            # 避免 ChromaDB 存在残留数据，而在 MySQL 已经被删除导致 Foreign Key 约束报错终止匹配
+            resume_obj = await session.get(Resume, resume_db_id)
+            if not resume_obj: continue
+            
             resume_edu_val = metadatas[i]["edu_val"]
             
             semantic_score = max(0, (1 - distances[i])) * 100
@@ -243,21 +248,21 @@ async def _match_jd_to_all_resumes(session: AsyncSession, jd: JobDescription, jd
                 hard_score = 60
 
             total = round(0.3 * hard_score + 0.7 * semantic_score, 2)
-            await _upsert_match_record(session, jd.id, resume_db_id, semantic_score, total)
+            await _upsert_match_record(session, jd.id, resume_db_id, total)
             
         logger.info(f"Successfully matched JD {jd.id} to {len(ids)} Resumes.")
     except Exception as e:
         logger.error(f"CRASH in _match_jd_to_all_resumes: {e}", exc_info=True)
 
 
-async def _upsert_match_record(session: AsyncSession, jd_id: int, resume_id: int, sim_score: float, total_score: float):
+async def _upsert_match_record(session: AsyncSession, jd_id: int, resume_id: int, total_score: float):
     query = select(MatchRecord).where(MatchRecord.jd_id == jd_id, MatchRecord.resume_id == resume_id)
     result = await session.execute(query)
     record = result.scalars().first()
 
     if record:
-        record.vector_similarity = sim_score
-        record.final_score = total_score
+        record.vector_similarity = total_score
+        # 不更新 final_score，保留为精筛后的最终评分
         if record.workflow_status == 'failed':
             record.workflow_status = 'rough_matching'
     else:
@@ -265,8 +270,8 @@ async def _upsert_match_record(session: AsyncSession, jd_id: int, resume_id: int
             jd_id=jd_id,
             resume_id=resume_id,
             workflow_status="rough_matching",
-            vector_similarity=sim_score,
-            final_score=total_score
+            vector_similarity=total_score,
+            final_score=None
         )
         session.add(new_record)
         

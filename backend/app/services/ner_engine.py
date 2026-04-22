@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """BERT-based NER inference for resumes."""
 
 from __future__ import annotations
@@ -20,6 +20,13 @@ import pdfplumber
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, BertModel, BertPreTrainedModel
+
+# 彻底封堵 transformers 后台去 HuggingFace 请求讨论区的行为
+try:
+    import transformers.safetensors_conversion
+    transformers.safetensors_conversion.auto_conversion = lambda *args, **kwargs: None
+except (ImportError, AttributeError):
+    pass
 
 
 @dataclass(frozen=True)

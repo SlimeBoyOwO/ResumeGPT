@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import api from '@/utils/api'
+import ResumeDataViewer from '@/components/ResumeDataViewer.vue'
 
 interface ResumeItem {
   id: number
@@ -101,7 +102,7 @@ onMounted(fetchResumes)
 </script>
 
 <template>
-  <div class="animate-fade-in space-y-6">
+  <div class="animate-fade-in space-y-6 h-full">
     <div>
       <h1 class="text-2xl font-bold text-surface-900">简历管理</h1>
       <p class="text-surface-500 mt-1">查看和管理所有用户上传的简历</p>
@@ -149,19 +150,29 @@ onMounted(fetchResumes)
         <table class="w-full">
           <thead class="bg-surface-50">
             <tr>
-              <th class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">
+              <th
+                class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider"
+              >
                 文件信息
               </th>
-              <th class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">
+              <th
+                class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider"
+              >
                 上传用户
               </th>
-              <th class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">
+              <th
+                class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider"
+              >
                 状态
               </th>
-              <th class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">
+              <th
+                class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider"
+              >
                 解析结果
               </th>
-              <th class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider">
+              <th
+                class="text-left px-6 py-3.5 text-xs font-semibold text-surface-500 uppercase tracking-wider"
+              >
                 上传时间
               </th>
             </tr>
@@ -170,8 +181,20 @@ onMounted(fetchResumes)
             <tr>
               <td colspan="5" class="text-center py-16">
                 <svg class="animate-spin h-8 w-8 text-primary-400 mx-auto" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                    fill="none"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
               </td>
             </tr>
@@ -229,12 +252,15 @@ onMounted(fetchResumes)
       </div>
 
       <!-- 分页 -->
-      <div v-if="totalPages > 1" class="flex items-center justify-between px-6 py-4 border-t border-surface-100">
+      <div
+        v-if="totalPages > 1"
+        class="flex items-center justify-between px-6 py-4 border-t border-surface-100"
+      >
         <span class="text-sm text-surface-500">共 {{ total }} 条记录</span>
         <div class="flex items-center gap-2">
           <button
             :disabled="currentPage === 1"
-            @click="currentPage--; fetchResumes()"
+            @click="(currentPage--, fetchResumes())"
             class="px-3 py-1.5 rounded-lg text-sm disabled:opacity-40 hover:bg-surface-100 transition-colors cursor-pointer"
           >
             上一页
@@ -242,7 +268,7 @@ onMounted(fetchResumes)
           <span class="text-sm text-surface-500 px-2">{{ currentPage }} / {{ totalPages }}</span>
           <button
             :disabled="currentPage === totalPages"
-            @click="currentPage++; fetchResumes()"
+            @click="(currentPage++, fetchResumes())"
             class="px-3 py-1.5 rounded-lg text-sm disabled:opacity-40 hover:bg-surface-100 transition-colors cursor-pointer"
           >
             下一页
@@ -251,30 +277,51 @@ onMounted(fetchResumes)
       </div>
     </div>
 
-    <!-- 解析结果抽屉 -->
-    <div
-      v-if="drawerOpen"
-      class="fixed inset-0 z-50 bg-black/30"
-      @click.self="closeDrawer"
-    >
-      <div class="absolute right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl p-6 overflow-y-auto">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold text-surface-900">解析结果</h3>
-          <button
-            @click="closeDrawer"
-            class="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-200 text-sm text-surface-600"
+    <!-- 解析结果 Modal -->
+    <Teleport to="body">
+      <div
+        v-if="drawerOpen"
+        class="fixed inset-0 z-[100] bg-black/40 overflow-y-auto p-4 sm:p-10 flex justify-center items-start"
+        @click.self="closeDrawer"
+      >
+        <div
+          class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden my-auto animate-fade-in"
+        >
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b border-surface-100 shrink-0"
           >
-            关闭
-          </button>
+            <div>
+              <h3 class="text-xl font-bold text-surface-900 flex items-center gap-2">
+                <span>📄</span> 简历内容解析卡片
+              </h3>
+              <div class="text-xs text-surface-500 mt-1 flex flex-wrap gap-4">
+                <span
+                  ><span class="font-medium text-surface-700">源文件：</span
+                  >{{ drawerResume?.original_filename || '-' }}</span
+                >
+                <span
+                  ><span class="font-medium text-surface-700">所属用户：</span
+                  >{{ drawerResume?.username || '-' }}</span
+                >
+                <span
+                  ><span class="font-medium text-surface-700">向量ID：</span
+                  >{{ drawerResume?.vector_id || '未生成' }}</span
+                >
+              </div>
+            </div>
+            <button
+              @click="closeDrawer"
+              class="p-2 rounded-xl bg-surface-100 hover:bg-danger-50 hover:text-danger-500 text-surface-600 transition-colors cursor-pointer"
+              title="关闭"
+            >
+              ❌
+            </button>
+          </div>
+          <div class="p-4 overflow-y-auto bg-surface-50/50 flex-1">
+            <ResumeDataViewer :data="drawerResume?.ner_extracted_data || null" />
+          </div>
         </div>
-        <div class="text-sm text-surface-500 mb-3">
-          <span class="font-medium text-surface-700">向量ID：</span>
-          <span>{{ drawerResume?.vector_id || '-' }}</span>
-        </div>
-        <pre class="bg-surface-50 border border-surface-200 rounded-xl p-4 text-xs whitespace-pre-wrap">
-{{ formatJson(drawerResume?.ner_extracted_data || null) }}
-        </pre>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>

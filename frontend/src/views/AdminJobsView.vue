@@ -140,6 +140,16 @@ async function viewMatches(job: JobItem) {
   }
 }
 
+async function deleteJob(id: number) {
+  if (!confirm('确定要删除这个 JD 吗？相关的匹配记录也将被同时删除。')) return
+  try {
+    await api.delete(`/job-descriptions/${id}`)
+    await fetchJobs()
+  } catch (err: any) {
+    alert(err.response?.data?.detail || '删除失败，请重试')
+  }
+}
+
 async function viewEvaluations(match: any) {
   selectedMatchForEvals.value = match
   evaluationsDrawerOpen.value = true
@@ -334,6 +344,12 @@ onMounted(async () => {
                 class="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition font-medium"
               >
                 📊 查看初筛匹配
+              </button>
+              <button
+                @click="deleteJob(job.id)"
+                class="mt-2 ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger-50 text-danger-700 hover:bg-danger-100 transition font-medium cursor-pointer"
+              >
+                🗑️ 删除
               </button>
             </div>
           </div>

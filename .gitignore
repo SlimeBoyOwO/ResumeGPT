@@ -119,8 +119,8 @@ game_data/musics/
 .trash/
 # 其他工具目录
 .openmcp/
-.claude
-CLAUDE.md
+# .claude
+# CLAUDE.md
 uploads/
 
 
